@@ -25,13 +25,16 @@ import {
 const MODEL_URL = "/models/pet_stage1_baby.glb";
 
 /* ── 성형 튜닝 (오퍼레이터 피드백 반영) ──────────────────────────
- * 원본 에셋 대비: 전체 크기 70%, 눈 50%, 코(입 자리의 'o') 40%.
- * 지오메트리 수정 없이 노드 스케일로 처리한다 — 피벗(눈알 중심)을
- * 기준으로 줄여야 하이라이트·속눈썹이 눈알 안에 그대로 남는다.
+ * 원본 에셋 대비: 전체 크기 70%, 눈 150%, 코 30%, 입 200%.
+ * 모델에는 얼굴 가운데 짙은 점('o') 하나뿐이라 이를 코로 삼아 줄이고,
+ * 입은 스마일 아크를 새로 만들어 붙인다 (같은 mouth 재질 재사용).
+ * 눈은 피벗(눈알 중심) 기준으로 키워야 하이라이트가 제자리에 남는다.
  */
 const PET_SHRINK = 0.7;
-const EYE_SCALE = 0.5;
-const NOSE_SCALE = 0.4;
+const EYE_SCALE = 1.5;
+const NOSE_SCALE = 0.3;
+/** 새로 붙이는 스마일 입 — 원본 'o'(폭 0.03) 대비 폭 배율 */
+const MOUTH_SCALE = 2.0;
 
 /**
  * 메시를 지정한 피벗 기준으로 s배 축소한다.
@@ -73,14 +76,32 @@ function applyFaceTweaks(scene: THREE.Group, nodes: Record<string, unknown>) {
     }
   }
 
-  // 코('o'): Body 직속 자식 중 mouth 머티리얼 메시 — 제 중심 기준으로 축소
+  // 코: Body 직속 자식 중 mouth 머티리얼 메시(가운데 점) — 제 중심 기준으로 축소
   const body = nodes.Body as THREE.Object3D | undefined;
   const nose = body?.children.find(
     (o) =>
       (o as THREE.Mesh).isMesh &&
       ((o as THREE.Mesh).material as THREE.Material).name === "mouth",
   ) as THREE.Mesh | undefined;
-  if (nose) shrinkAboutPivot(nose, centerOf(nose), NOSE_SCALE);
+  if (!nose || !body) return;
+  const noseCenter = centerOf(nose);
+  const noseFrontZ = nose.geometry.boundingBox!.max.z;
+  shrinkAboutPivot(nose, noseCenter, NOSE_SCALE);
+
+  // 입: 코 아래에 스마일 아크(토러스 일부)를 새로 만들어 붙인다.
+  // 폭 = 원본 'o' × MOUTH_SCALE. 호가 원 아래쪽에 오도록 돌리면 ∪(스마일).
+  const arc = 1.8; // 호의 각도(rad) — 클수록 활짝 웃는 입
+  const width = 0.03 * MOUTH_SCALE;
+  const radius = width / (2 * Math.sin(arc / 2));
+  const mouth = new THREE.Mesh(
+    // (반지름, 선 굵기, 단면 분할, 호 분할, 호 각도) — 로우폴리 유지
+    new THREE.TorusGeometry(radius, 0.0045, 6, 14, arc),
+    nose.material,
+  );
+  mouth.rotation.z = -Math.PI / 2 - arc / 2; // 호를 원의 맨 아래로
+  // 호의 최하단이 코보다 살짝 아래(-0.024)에 오도록 토러스 중심을 배치
+  mouth.position.set(0, noseCenter.y - 0.024 + radius, noseFrontZ - 0.001);
+  body.add(mouth);
 }
 
 /** 연출용 감정 상태 — 스토어의 무드·게이지에서 파생된다 */
