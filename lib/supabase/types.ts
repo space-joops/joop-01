@@ -9,7 +9,7 @@
 /** 펫 상태 — 사망은 없다 (기획서 원칙) */
 export type PetStatus = "active" | "sulky" | "sleep" | "hibernate";
 
-/** public.pets 테이블 한 행 */
+/** public.joop_01_pets 테이블 한 행 */
 export interface PetRow {
   id: string;
   user_id: string;
@@ -26,7 +26,7 @@ export interface PetRow {
   updated_at: string;
 }
 
-/** settle_offline() RPC가 돌려주는 정산 결과 */
+/** joop_01_settle_offline() RPC가 돌려주는 정산 결과 */
 export interface OfflineSettlement {
   settled: boolean;
   away_seconds: number;

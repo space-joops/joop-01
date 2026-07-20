@@ -39,7 +39,7 @@ npx supabase stop      # 로컬 스택 종료
 
 **PWA 구현됨** (개발 일지 3편 참조): 매니페스트(`app/manifest.ts`), 서비스 워커(`public/sw.js` — `?v=버전-빌드스탬프` 쿼리로 배포마다 강제 갱신), 설치 넛지, 웹 푸시(VAPID — 환경변수 `NEXT_PUBLIC_VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT` 필요, `scripts/generate-vapid-keys.mjs`로 생성), 동적 파비콘. 서비스 워커는 프로덕션 빌드(`npm run build && npm start`)에서만 등록됩니다. 앱 버전은 `package.json` version을 `next.config.ts`가 빌드 시 구워 넣습니다.
 
-**Supabase 구현됨** (개발 일지 4편, `supabase/README.md` 참조): 익명 인증(쿠키 세션, `@supabase/ssr`), 스키마·RLS·정산 함수는 `supabase/migrations/`가 단일 진실. 환경변수 `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY` — **없으면 게임은 localStorage만 쓰는 로컬 모드로 폴백**합니다. 핵심 설계: 게임 규칙(오프라인 정산 `settle_offline()`, 스냅샷 저장 `sync_pet()`)은 Postgres 함수(security definer) 안에 있고, `pets` 테이블엔 update grant가 없어 직접 수정 치트가 차단됩니다. 시간 계산은 전부 DB `now()` 기준. 클라이언트 통합은 `components/pet-link.tsx`(부팅 정산·30초 동기화)와 `app/actions/pet.ts`. 익명 로그인은 클라우드 프로젝트에서 Anonymous sign-ins를 켜야 동작합니다.
+**Supabase 구현됨** (개발 일지 4편, `supabase/README.md` 참조): 익명 인증(쿠키 세션, `@supabase/ssr`), 스키마·RLS·정산 함수는 `supabase/migrations/`가 단일 진실. 환경변수 `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY` — **없으면 게임은 localStorage만 쓰는 로컬 모드로 폴백**합니다. 핵심 설계: 게임 규칙(오프라인 정산 `joop_01_settle_offline()`, 스냅샷 저장 `joop_01_sync_pet()`)은 Postgres 함수(security definer) 안에 있고, `joop_01_pets` 테이블엔 update grant가 없어 직접 수정 치트가 차단됩니다. 모든 DB 객체는 `joop_01_` 접두사를 씁니다(한 Supabase 프로젝트를 여러 실험이 공유하기 위한 네임스페이스). 시간 계산은 전부 DB `now()` 기준. 클라이언트 통합은 `components/pet-link.tsx`(부팅 정산·30초 동기화)와 `app/actions/pet.ts`. 익명 로그인은 클라우드 프로젝트에서 Anonymous sign-ins를 켜야 동작합니다.
 
 **기획상 필요하지만 아직 미설치** — 해당 기능을 구현하는 시점에 추가하세요:
 

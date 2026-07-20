@@ -21,23 +21,21 @@ npx supabase stop      # 종료
 
 1. [supabase.com](https://supabase.com)에서 프로젝트 생성 (무료 티어 충분)
 2. **Authentication → Sign In / Providers → Anonymous sign-ins 켜기** (잊기 쉬움!)
-3. 프로젝트에 예전 실험용 테이블이 남아 있다면 먼저 정리 (반드시 내용 확인 후!):
-   ```sql
-   drop table if exists public.pets cascade;
-   drop trigger if exists on_auth_user_created on auth.users;
-   drop function if exists public.handle_new_user();
-   ```
-4. 마이그레이션 적용 — 둘 중 하나:
+3. 마이그레이션 적용 — 둘 중 하나:
    - 대시보드 SQL Editor에 `migrations/20260721000000_joops_init.sql` 붙여넣고 실행
    - 또는 CLI: `npx supabase login` 후 `npx supabase link --project-ref <ref>` → `npx supabase db push`
-5. Vercel 환경변수에 프로젝트 URL과 키 등록 (`.env.example` 참조).
+4. Vercel 환경변수에 프로젝트 URL과 키 등록 (`.env.example` 참조).
    키는 신형(`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `sb_publishable_…`)과
    구형(`NEXT_PUBLIC_SUPABASE_ANON_KEY`, JWT) 어느 쪽이든 인식한다.
 
 ## 스키마 개요
 
-- `profiles` — auth.users 1:1 확장 (가입 트리거로 자동 생성)
-- `pets` — 유저당 1마리. **update grant 없음** — 쓰기는 RPC로만:
-  - `settle_offline()` — 오프라인 정산 (DB now() 기준, security definer)
-  - `sync_pet(...)` — 플레이 중 스냅샷 저장 (서버 측 클램프)
-- `offline_logs` — 정산 기록 (귀환 보고의 원본)
+모든 DB 객체는 `joop_01_` 접두사를 쓴다 — 하나의 Supabase 프로젝트를
+여러 실험이 공유하므로, 접두사가 네임스페이스 역할을 해서 기존 테이블과
+충돌하지 않는다.
+
+- `joop_01_profiles` — auth.users 1:1 확장 (가입 트리거로 자동 생성)
+- `joop_01_pets` — 유저당 1마리. **update grant 없음** — 쓰기는 RPC로만:
+  - `joop_01_settle_offline()` — 오프라인 정산 (DB now() 기준, security definer)
+  - `joop_01_sync_pet(...)` — 플레이 중 스냅샷 저장 (서버 측 클램프)
+- `joop_01_offline_logs` — 정산 기록 (귀환 보고의 원본)

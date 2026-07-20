@@ -32,7 +32,7 @@ export async function bootPet(): Promise<BootPetResult> {
 
   // 1) 내 펫 조회 (RLS 덕분에 "내 것"만 보인다 — where user_id는 이중 안전장치)
   const { data: existing, error: selectError } = await supabase
-    .from("pets")
+    .from("joop_01_pets")
     .select("*")
     .eq("user_id", user.id)
     .maybeSingle();
@@ -43,7 +43,7 @@ export async function bootPet(): Promise<BootPetResult> {
   // 2) 첫 접속이면 기본값으로 부화 — 갓 태어난 펫은 정산할 과거가 없다
   if (!existing) {
     const { data: created, error: insertError } = await supabase
-      .from("pets")
+      .from("joop_01_pets")
       .insert({ user_id: user.id })
       .select("*")
       .single();
@@ -55,7 +55,7 @@ export async function bootPet(): Promise<BootPetResult> {
 
   // 3) 오프라인 정산 — 시간 계산은 전부 DB의 now() 기준 (개발 원칙 4)
   const { data: settlement, error: rpcError } = await supabase.rpc(
-    "settle_offline",
+    "joop_01_settle_offline",
   );
   if (rpcError) {
     // 정산이 실패해도 게임은 계속되어야 한다 — 마지막 상태로 입장
@@ -87,7 +87,7 @@ export async function syncPet(snapshot: PetSnapshot): Promise<{ ok: boolean }> {
   const supabase = await getSupabaseServerClient();
   if (!supabase) return { ok: false };
 
-  const { error } = await supabase.rpc("sync_pet", {
+  const { error } = await supabase.rpc("joop_01_sync_pet", {
     p_battery: snapshot.battery,
     p_durability: snapshot.durability,
     p_data_used: snapshot.dataUsed,
