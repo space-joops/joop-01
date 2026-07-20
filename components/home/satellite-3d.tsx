@@ -10,6 +10,7 @@ import {
   isDataFull,
   type PetMood,
 } from "@/stores/pet-store";
+import type { PetVariant } from "@/lib/supabase/types";
 
 /**
  * 3D 줍이 — 캐릭터 에셋 팩 v2의 GLB + 감정 포즈 레시피 구현.
@@ -22,7 +23,14 @@ import {
  * 성능 원칙(개발 원칙 3): 로우폴리 GLB(63KB) + 조명 3개 + 그림자 없음.
  */
 
-const MODEL_URL = "/models/pet_stage1_baby.glb";
+const STAGE1_URL = "/models/pet_stage1_baby.glb";
+
+/** 진화 단계·장비 → GLB 경로 (에셋 팩 v2의 6종 중 펫 5종) */
+function modelUrlFor(level: number, variant: PetVariant | null): string {
+  if (level >= 3 && variant) return `/models/pet_stage3_${variant}.glb`;
+  if (level >= 2) return "/models/pet_stage2_junior.glb";
+  return STAGE1_URL;
+}
 
 /* ── 성형 튜닝 (오퍼레이터 피드백 반영) ──────────────────────────
  * 원본의 납작한 알약 눈은 키울수록 슬래브처럼 튀어나와 귀엽지 않다
@@ -202,12 +210,14 @@ interface Satellite3DProps {
 }
 
 /** GLB를 로드해 감정 연출을 입히는 본체 (Canvas 안에서만 렌더 가능) */
-function PetModel({ petting, burstNonce }: Satellite3DProps) {
-  const { scene, nodes, materials } = useGLTF(MODEL_URL);
+function PetModel({ url, petting, burstNonce }: Satellite3DProps & { url: string }) {
+  const { scene, nodes, materials } = useGLTF(url);
 
   // 리그 준비: 노드 참조 + "초기 자세" 백업 + 화면 프레이밍 계산.
   // GLB의 힌지 노드는 기본 자세(matrix)를 갖고 있으므로, 매 프레임
   // "초기 쿼터니언 × 오프셋 회전"으로 합성해야 원래 각도가 보존된다.
+  // 노드 구성은 단계마다 다르다(3단계는 귀 2쌍, 2단계+는 아우터 패널…)
+  // — 이름 규약으로 있는 것만 수집하므로 어떤 모델이 와도 동작한다.
   const rig = useMemo(() => {
     const grab = (name: string) => {
       const node = nodes[name] as THREE.Object3D | undefined;
@@ -221,16 +231,32 @@ function PetModel({ petting, burstNonce }: Satellite3DProps) {
 
     // 눈·코 성형은 프레이밍 측정 후에 적용 (외곽 크기에 영향 없음)
     applyFaceTweaks(scene, nodes as Record<string, unknown>);
+
+    // 안테나(귀·꼬리): 1~2단계 Antenna_Tip 1개, 3단계 좌우 쫑긋 귀 2개
+    const tips = ["Antenna_Tip", "Antenna_L_Tip", "Antenna_R_Tip"]
+      .map((name) => ({ grabbed: grab(name), dir: name.includes("_R_") ? -1 : 1 }))
+      .filter((t) => t.grabbed)
+      .map((t) => ({ ...t.grabbed!, dir: t.dir }));
+
+    // 패널(팔·날개): 메시 좌표 실측 기준 Panel_L = -X, Panel_R = +X.
+    // 2단계+의 _Outer는 부모 패널 기준 아코디언 역방향(배율 -2.9)으로 접힌다
+    const panelSpecs: [string, number, number][] = [
+      ["Panel_L", -1, 1.75],
+      ["Panel_R", 1, 1.75],
+      ["Panel_L_Outer", -1, -2.9],
+      ["Panel_R_Outer", 1, -2.9],
+    ];
+    const panels = panelSpecs
+      .map(([name, sx, mult]) => ({ grabbed: grab(name), sx, mult }))
+      .filter((p) => p.grabbed)
+      .map((p) => ({ ...p.grabbed!, sx: p.sx, mult: p.mult }));
+
     return {
-      tips: [grab("Antenna_Tip")].filter(Boolean).map((t, i) => ({
-        ...t!,
-        dir: i % 2 === 0 ? 1 : -1,
-      })),
-      // 메시 좌표 실측 기준: Panel_L은 -X 방향, Panel_R은 +X 방향으로 뻗는다
-      panels: [
-        { ...grab("Panel_L"), sx: -1 },
-        { ...grab("Panel_R"), sx: 1 },
-      ].filter((p) => p.node) as { node: THREE.Object3D; q0: THREE.Quaternion; sx: number }[],
+      tips,
+      panels,
+      // 장비 마이크로 아이들 (있는 모델에서만): 그물 후프 회전, 터렛 두리번
+      netRing: grab("NetRing"),
+      turretHead: grab("Turret_Head"),
       eyeMat: materials.eye as THREE.MeshStandardMaterial | undefined,
       center,
       scale,
@@ -245,6 +271,7 @@ function PetModel({ petting, burstNonce }: Satellite3DProps) {
     flapT: -9, // 마지막 기쁨 버스트 시각
     nextBlink: 2.5,
     wakeFlash: 0,
+    ringAngle: 0, // 그물 후프 누적 회전각
     prevEmotion: "normal" as Emotion,
   }).current;
 
@@ -309,14 +336,31 @@ function PetModel({ petting, burstNonce }: Satellite3DProps) {
       node.quaternion.copy(q0).multiply(offsetQuat.setFromEuler(offsetEuler));
     }
 
-    // 날개(팔): 절전·동면 접힘 + 시무룩 축 처짐
-    for (const { node, q0, sx } of rig.panels) {
+    // 날개(팔): 절전·동면 접힘 + 시무룩 축 처짐 (아우터는 역방향 아코디언)
+    for (const { node, q0, sx, mult } of rig.panels) {
+      const isBasePanel = mult > 0;
       offsetEuler.set(
         0,
-        sx * st.fold * 1.75,
-        (emotion === "sulky" ? -sx * 0.16 : 0) * (1 - st.fold),
+        sx * st.fold * mult,
+        (emotion === "sulky" && isBasePanel ? -sx * 0.16 : 0) * (1 - st.fold),
       );
       node.quaternion.copy(q0).multiply(offsetQuat.setFromEuler(offsetEuler));
+    }
+
+    // 장비 마이크로 아이들 — 깨어 있을 때만 살아 움직인다
+    const awake = emotion !== "hibernate" && emotion !== "powersave";
+    if (rig.netRing) {
+      st.ringAngle += dt * (awake ? 0.5 : 0.05);
+      offsetEuler.set(0, 0, st.ringAngle);
+      rig.netRing.node.quaternion
+        .copy(rig.netRing.q0)
+        .multiply(offsetQuat.setFromEuler(offsetEuler));
+    }
+    if (rig.turretHead) {
+      offsetEuler.set(0, awake ? Math.sin(now * 0.9) * 0.18 : 0, 0);
+      rig.turretHead.node.quaternion
+        .copy(rig.turretHead.q0)
+        .multiply(offsetQuat.setFromEuler(offsetEuler));
     }
 
     // 눈 = 상태등: 감정별 색·깜빡임 패턴
@@ -369,6 +413,10 @@ function PetModel({ petting, burstNonce }: Satellite3DProps) {
 
 /** 홈 화면에 얹는 3D 캔버스 — 배경 투명이라 별밤 CSS가 그대로 비친다 */
 export default function Satellite3D(props: Satellite3DProps) {
+  // 진화하면 모델이 바뀐다. key로 강제 리마운트해 리그를 깨끗하게 다시 준비
+  const level = usePetStore((state) => state.level);
+  const variant = usePetStore((state) => state.variant);
+  const url = modelUrlFor(level, variant);
   return (
     <Canvas
       // 거의 정면에서 살짝 위 — 얼굴(눈·입)이 가장 사랑스럽게 보이는 각도
@@ -383,13 +431,14 @@ export default function Satellite3D(props: Satellite3DProps) {
       <directionalLight color={0xfff4e0} intensity={1.0} position={[1.4, 2.2, 1.6]} />
       <directionalLight color={0x7df5ea} intensity={0.4} position={[-2, 0.6, -2]} />
       <Suspense fallback={null}>
-        <PetModel {...props} />
+        <PetModel key={url} url={url} {...props} />
       </Suspense>
     </Canvas>
   );
 }
 
-// 모듈 로드 시점에 GLB 미리 받기 — 첫 등장 순간의 빈 화면을 줄인다
+// 모듈 로드 시점에 1단계 GLB 미리 받기 — 첫 등장 순간의 빈 화면을 줄인다.
+// 상위 단계 모델(각 100KB 안팎)은 진화 순간에 받아도 충분히 빠르다.
 if (typeof window !== "undefined") {
-  useGLTF.preload(MODEL_URL);
+  useGLTF.preload(STAGE1_URL);
 }
