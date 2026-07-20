@@ -4,6 +4,9 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import IntroCutscene from "@/components/intro/intro-cutscene";
 import HomeScreen from "@/components/home/home-screen";
+import PetLink from "@/components/pet-link";
+import OfflineRewardModal from "@/components/home/offline-reward-modal";
+import type { OfflineSettlement } from "@/lib/supabase/types";
 
 /**
  * 게임 진입 분기 — 첫 방문이면 오프닝 컷신, 아니면 바로 홈 화면.
@@ -21,6 +24,10 @@ export default function GameRoot() {
   // 마운트 후(브라우저에서만 실행되는 useEffect) 분기해야 hydration이 어긋나지 않는다.
   const [stage, setStage] = useState<Stage>("boot");
 
+  // 오프라인 정산 결과 — 있으면 홈 화면 진입 시 귀환 보고 모달을 띄운다.
+  // 컷신 도중에 정산이 끝나도 모달은 stage가 "game"이 된 뒤에만 그려진다.
+  const [settlement, setSettlement] = useState<OfflineSettlement | null>(null);
+
   useEffect(() => {
     const forceIntro = new URLSearchParams(window.location.search).has("intro");
     const seen = window.localStorage.getItem(INTRO_SEEN_KEY);
@@ -33,7 +40,9 @@ export default function GameRoot() {
   };
 
   return (
-    <div className="h-full bg-black">
+    <div className="relative h-full bg-black">
+      {/* 관제 링크 — 화면 밖에서 세션·정산·동기화를 담당 (로컬 모드면 침묵) */}
+      <PetLink onSettlement={setSettlement} />
       <AnimatePresence mode="wait">
         {stage === "intro" && (
           <motion.div
@@ -57,6 +66,16 @@ export default function GameRoot() {
           </motion.div>
         )}
         {/* stage === "boot"이면 아무것도 그리지 않음 — 컷신 첫 장면(암전)과 자연스럽게 이어진다 */}
+      </AnimatePresence>
+
+      {/* 귀환 보고 — 자리 비운 사이 줍이가 모아온 것들 */}
+      <AnimatePresence>
+        {stage === "game" && settlement && (
+          <OfflineRewardModal
+            settlement={settlement}
+            onClose={() => setSettlement(null)}
+          />
+        )}
       </AnimatePresence>
     </div>
   );

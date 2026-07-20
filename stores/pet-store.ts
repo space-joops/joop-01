@@ -1,4 +1,6 @@
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import type { PetRow } from "@/lib/supabase/types";
 
 /**
  * 펫(위성) 3대 상태 지표 스토어 — 게임의 두뇌.
@@ -6,6 +8,13 @@ import { create } from "zustand";
  * 파이썬으로 비유하면 "전역 싱글톤 dataclass + 메서드 묶음"이다.
  * 화면(컴포넌트)들은 이 스토어를 구독(subscribe)하고 있다가,
  * 값이 바뀌면 해당 값을 쓰는 컴포넌트만 다시 렌더링된다.
+ *
+ * 영속성 2단 구조:
+ *   1) persist 미들웨어 → localStorage. 새로고침해도 줍이가 기억을
+ *      잃지 않는 1차 저장소 (Supabase 키가 없는 로컬 모드의 전부).
+ *   2) Supabase 연동 시 → 접속 때 서버 정산 결과로 덮어쓰고(hydrate),
+ *      플레이 중엔 PetLink가 주기적으로 서버에 스냅샷을 올린다.
+ *      이때 서버가 항상 진실의 원천(source of truth)이다.
  */
 
 /** 모든 게이지는 0~100 스케일 */
@@ -43,44 +52,71 @@ interface PetState {
   chargeSolar: () => void;
   /** 실시간 틱 — 궤도를 도는 동안 배터리가 자연 소모된다 */
   tickIdle: () => void;
+  /** 서버 정산 결과로 상태 덮어쓰기 — DB 컬럼명(snake_case)을 여기서 번역한다 */
+  hydrateFromServer: (pet: PetRow) => void;
 }
 
-export const usePetStore = create<PetState>((set) => ({
-  // 첫 화면에서 게이지 변화를 바로 체험할 수 있도록 일부러 꽉 채우지 않은 초기값
-  battery: 80,
-  durability: 65,
-  dataUsed: 40,
-  debris: 0,
-  exp: 0,
+export const usePetStore = create<PetState>()(
+  persist(
+    (set) => ({
+      // 첫 화면에서 게이지 변화를 바로 체험할 수 있도록 일부러 꽉 채우지 않은 초기값
+      battery: 80,
+      durability: 65,
+      dataUsed: 40,
+      debris: 0,
+      exp: 0,
 
-  eatDebris: () =>
-    set((state) => {
-      // 절전 모드(배터리 0)에서는 먹지 못한다 — 충전이 먼저!
-      if (state.battery <= 0) return state;
-      const efficiency =
-        state.dataUsed >= GAUGE_MAX ? FULL_DATA_EFFICIENCY : 1;
-      return {
-        debris: state.debris + 1 * efficiency,
-        dataUsed: clamp(state.dataUsed + 6),
-        battery: clamp(state.battery - 2),
-        exp: state.exp + 2,
-      };
+      eatDebris: () =>
+        set((state) => {
+          // 절전 모드(배터리 0)에서는 먹지 못한다 — 충전이 먼저!
+          if (state.battery <= 0) return state;
+          const efficiency =
+            state.dataUsed >= GAUGE_MAX ? FULL_DATA_EFFICIENCY : 1;
+          return {
+            debris: state.debris + 1 * efficiency,
+            dataUsed: clamp(state.dataUsed + 6),
+            battery: clamp(state.battery - 2),
+            exp: state.exp + 2,
+          };
+        }),
+
+      soothe: () =>
+        set((state) => ({
+          durability: clamp(state.durability + 2),
+          exp: state.exp + 1,
+        })),
+
+      transmitData: () => set({ dataUsed: 0 }),
+
+      chargeSolar: () =>
+        set((state) => ({ battery: clamp(state.battery + 18) })),
+
+      tickIdle: () =>
+        set((state) => ({ battery: clamp(state.battery - 1) })),
+
+      hydrateFromServer: (pet) =>
+        set({
+          battery: Number(pet.battery),
+          durability: Number(pet.durability),
+          dataUsed: Number(pet.data_used),
+          debris: Number(pet.debris),
+          exp: pet.exp,
+        }),
     }),
-
-  soothe: () =>
-    set((state) => ({
-      durability: clamp(state.durability + 2),
-      exp: state.exp + 1,
-    })),
-
-  transmitData: () => set({ dataUsed: 0 }),
-
-  chargeSolar: () =>
-    set((state) => ({ battery: clamp(state.battery + 18) })),
-
-  tickIdle: () =>
-    set((state) => ({ battery: clamp(state.battery - 1) })),
-}));
+    {
+      // localStorage 키 — 구조가 바뀌면 v2로 올려서 낡은 저장본과 충돌을 피한다
+      name: "joops.pet.v1",
+      // 함수는 저장할 수 없으니 데이터 필드만 골라 저장한다 (피클링 대상 선별)
+      partialize: (state) => ({
+        battery: state.battery,
+        durability: state.durability,
+        dataUsed: state.dataUsed,
+        debris: state.debris,
+        exp: state.exp,
+      }),
+    },
+  ),
+);
 
 /* ── 파생 상태 헬퍼 ──────────────────────────────
  * 저장하지 않고 그때그때 계산하는 값들.
