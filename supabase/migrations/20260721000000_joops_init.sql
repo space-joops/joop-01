@@ -14,6 +14,21 @@
 --      모든 쓰기는 검증 로직이 들어 있는 RPC 두 개로만 이루어진다.
 -- ═══════════════════════════════════════════════════════════════
 
+-- ── 0. 멱등성 보장: 우리 것(joop_01_*)만 지우고 처음부터 다시 만든다 ──
+-- 대시보드 SQL Editor에서 몇 번을 실행해도 항상 같은 최종 상태가 된다.
+-- 접두사 밖의 객체(다른 실험의 테이블)는 절대 건드리지 않는다.
+--
+-- ⚠️ 주의: drop-후-재생성은 joop_01_* 테이블의 데이터를 비운다.
+--   실제 유저 데이터가 생긴 뒤에는 이 방식을 버리고, 변경분만 담은
+--   증분 마이그레이션(alter table …)을 새 파일로 추가해야 한다.
+drop trigger  if exists joop_01_on_auth_user_created on auth.users;
+drop function if exists public.joop_01_handle_new_user();
+drop function if exists public.joop_01_settle_offline();
+drop function if exists public.joop_01_sync_pet(numeric, numeric, numeric, numeric, int);
+drop table    if exists public.joop_01_offline_logs cascade;
+drop table    if exists public.joop_01_pets         cascade;
+drop table    if exists public.joop_01_profiles     cascade;
+
 -- ── 1. joop_01_profiles: auth.users 1:1 확장 (오퍼레이터 프로필) ──
 -- auth.users는 Supabase가 관리하는 시스템 테이블이라 직접 컬럼을 못 늘린다.
 -- 관례대로 public에 프로필 테이블을 만들어 게임용 정보를 담는다.
