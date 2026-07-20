@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>줍스 — 통신 두절</title>
+    <style>
+      /* 오프라인 폴백 페이지 — 외부 리소스 없이 이 파일 하나로 완결되어야 한다 */
+      body {
+        margin: 0;
+        min-height: 100dvh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        background: radial-gradient(ellipse at center, #141737 0%, #060714 75%);
+        color: #e8eaf6;
+        font-family: "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+        text-align: center;
+        padding: 24px;
+      }
+      .satellite {
+        font-size: 64px;
+        animation: float 3.2s ease-in-out infinite;
+      }
+      @keyframes float {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-10px); }
+      }
+      h1 { font-size: 18px; margin: 0; }
+      p { font-size: 13px; color: rgba(232, 234, 246, 0.6); margin: 0; }
+      button {
+        margin-top: 16px;
+        padding: 12px 28px;
+        border-radius: 16px;
+        border: 1px solid #23264a;
+        background: #11132a;
+        color: #e8eaf6;
+        font-size: 14px;
+        font-weight: 600;
+      }
+      button:active { transform: scale(0.95); }
+    </style>
+  </head>
+  <body>
+    <div class="satellite">🛰️</div>
+    <h1>지상국과의 통신이 끊겼어요</h1>
+    <p>줍이는 궤도에서 계속 파편을 줍고 있어요.<br />네트워크가 돌아오면 다시 만나요!</p>
+    <button onclick="location.reload()">📡 다시 연결하기</button>
+  </body>
+</html>

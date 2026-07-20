@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { usePetStore, isSleeping, isDataFull } from "@/stores/pet-store";
+import { APP_VERSION } from "@/lib/pwa";
 import StatusGauges from "@/components/home/status-gauges";
 import PetSatellite from "@/components/home/pet-satellite";
+import ConsoleSettings from "@/components/home/console-settings";
 
 /**
  * 홈 화면 (관제 콘솔) — 헤더 · 게이지 · 펫 · 액션 버튼을 조립한다.
@@ -35,6 +37,9 @@ export default function HomeScreen() {
   const sleeping = isSleeping(battery);
   const dataFull = isDataFull(dataUsed);
 
+  // 관제 설정 시트 (알림 · 설치 · 버전 정보)
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
   // 궤도 순항 중 배터리 자연 소모.
   // getState()로 호출하면 interval을 다시 걸지 않고도 항상 최신 상태를 쓴다.
   useEffect(() => {
@@ -55,19 +60,33 @@ export default function HomeScreen() {
 
   return (
     <main className="flex h-full flex-col gap-3 p-4 pt-[max(1rem,env(safe-area-inset-top))]">
-      {/* 헤더: 운영사 + 보유 자원 */}
+      {/* 헤더: 운영사 + 보유 자원 + 설정 */}
       <header className="flex items-center justify-between">
         <div>
           <p className="text-[10px] font-semibold tracking-[0.2em] text-foreground/50">
             CLEAR SKY ‧ 관제 콘솔
+            {/* 배포 확인용 버전 — 관제 장비의 펌웨어 버전처럼 슬쩍 표기 */}
+            <span className="ml-1.5 font-mono text-[9px] font-normal tracking-normal text-foreground/30">
+              v{APP_VERSION}
+            </span>
           </p>
           <h1 className="text-lg font-bold">줍이 · LV.1</h1>
         </div>
-        <div className="text-right text-sm">
-          <p>
-            ☄️ 파편 <span className="font-bold">{Math.floor(debris)}</span>
-          </p>
-          <p className="text-[11px] text-foreground/50">EXP {exp}</p>
+        <div className="flex items-center gap-3">
+          <div className="text-right text-sm">
+            <p>
+              ☄️ 파편 <span className="font-bold">{Math.floor(debris)}</span>
+            </p>
+            <p className="text-[11px] text-foreground/50">EXP {exp}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSettingsOpen(true)}
+            aria-label="관제 설정 열기"
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-panel-border bg-panel text-sm transition active:scale-95"
+          >
+            ⚙️
+          </button>
         </div>
       </header>
 
@@ -118,6 +137,11 @@ export default function HomeScreen() {
           📡 데이터 전송
         </button>
       </footer>
+
+      <ConsoleSettings
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+      />
     </main>
   );
 }
