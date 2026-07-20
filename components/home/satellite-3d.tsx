@@ -25,16 +25,19 @@ import {
 const MODEL_URL = "/models/pet_stage1_baby.glb";
 
 /* ── 성형 튜닝 (오퍼레이터 피드백 반영) ──────────────────────────
- * 원본 에셋 대비: 전체 크기 70%, 눈 150%, 코 30%, 입 200%.
- * 모델에는 얼굴 가운데 짙은 점('o') 하나뿐이라 이를 코로 삼아 줄이고,
- * 입은 스마일 아크를 새로 만들어 붙인다 (같은 mouth 재질 재사용).
- * 눈은 피벗(눈알 중심) 기준으로 키워야 하이라이트가 제자리에 남는다.
+ * 원본의 납작한 알약 눈은 키울수록 슬래브처럼 튀어나와 귀엽지 않다
+ * (스크린샷 피드백). 그래서 원본 눈 메시를 숨기고 동그란 눈알 +
+ * 반짝 하이라이트로 교체한다. 코(가운데 점)는 30%로 축소, 입은
+ * 도톰한 스마일 아크를 새로 붙인다. 재질은 전부 원본 것을 재사용 —
+ * 눈알이 eye 재질을 쓰므로 상태등(감정별 emissive) 연출이 그대로 산다.
  */
 const PET_SHRINK = 0.7;
-const EYE_SCALE = 1.5;
+/** 동그란 눈알 반지름 — 원본 알약 반폭(0.033)과 비슷한 크기감 */
+const EYE_RADIUS = 0.03;
 const NOSE_SCALE = 0.3;
-/** 새로 붙이는 스마일 입 — 원본 'o'(폭 0.03) 대비 폭 배율 */
-const MOUTH_SCALE = 2.0;
+/** 스마일 입 폭·선 굵기 (모델 단위 m) */
+const MOUTH_WIDTH = 0.08;
+const MOUTH_THICK = 0.009;
 
 /**
  * 메시를 지정한 피벗 기준으로 s배 축소한다.
@@ -56,51 +59,79 @@ function applyFaceTweaks(scene: THREE.Group, nodes: Record<string, unknown>) {
     return mesh.geometry.boundingBox!.getCenter(new THREE.Vector3());
   };
 
-  // 눈: StatusLight 아래 메시들을 좌/우로 나눠, 같은 쪽 눈알 중심을 피벗으로 축소
-  const statusLight = nodes.StatusLight as THREE.Object3D | undefined;
-  if (statusLight) {
-    const meshes: THREE.Mesh[] = [];
-    statusLight.traverse((o) => {
-      if ((o as THREE.Mesh).isMesh) meshes.push(o as THREE.Mesh);
-    });
-    const pivots = new Map<number, THREE.Vector3>(); // 키: 좌(-1)/우(+1)
-    for (const m of meshes) {
-      if ((m.material as THREE.Material).name === "eye") {
-        const c = centerOf(m);
-        pivots.set(Math.sign(c.x), c);
-      }
-    }
-    for (const m of meshes) {
-      const pivot = pivots.get(Math.sign(centerOf(m).x));
-      if (pivot) shrinkAboutPivot(m, pivot, EYE_SCALE);
-    }
-  }
-
-  // 코: Body 직속 자식 중 mouth 머티리얼 메시(가운데 점) — 제 중심 기준으로 축소
+  // 기준 좌표: 코(가운데 점)의 중심과 얼굴 앞면 z
   const body = nodes.Body as THREE.Object3D | undefined;
+  const statusLight = nodes.StatusLight as THREE.Object3D | undefined;
   const nose = body?.children.find(
     (o) =>
       (o as THREE.Mesh).isMesh &&
       ((o as THREE.Mesh).material as THREE.Material).name === "mouth",
   ) as THREE.Mesh | undefined;
-  if (!nose || !body) return;
+  if (!body || !statusLight || !nose) return;
   const noseCenter = centerOf(nose);
-  const noseFrontZ = nose.geometry.boundingBox!.max.z;
+  const faceZ = nose.geometry.boundingBox!.max.z;
+
+  // ── 눈 교체: 원본 알약·하이라이트 메시를 숨기고 위치만 물려받는다
+  const originals: THREE.Mesh[] = [];
+  statusLight.traverse((o) => {
+    if ((o as THREE.Mesh).isMesh) originals.push(o as THREE.Mesh);
+  });
+  let eyeMat: THREE.Material | null = null;
+  let hiMat: THREE.Material | null = null;
+  const pivots = new Map<number, THREE.Vector3>(); // 키: 좌(-1)/우(+1)
+  for (const m of originals) {
+    const name = (m.material as THREE.Material).name;
+    if (name === "eye") {
+      eyeMat = m.material as THREE.Material;
+      pivots.set(Math.sign(centerOf(m).x), centerOf(m));
+    } else if (name === "hi") {
+      hiMat = m.material as THREE.Material;
+    }
+    m.visible = false;
+  }
+  if (eyeMat && hiMat) {
+    const eyeGeo = new THREE.SphereGeometry(EYE_RADIUS, 20, 14);
+    const hiBigGeo = new THREE.SphereGeometry(EYE_RADIUS * 0.34, 10, 8);
+    const hiSmallGeo = new THREE.SphereGeometry(EYE_RADIUS * 0.16, 8, 6);
+    for (const [, pivot] of pivots) {
+      const cy = pivot.y + 0.004;
+      const cz = faceZ - EYE_RADIUS * 0.45; // 절반쯤 얼굴에 파묻힌 볼록 눈
+      const ball = new THREE.Mesh(eyeGeo, eyeMat);
+      ball.position.set(pivot.x, cy, cz);
+      ball.scale.z = 0.72; // 살짝 납작하게 — 옆에서 봐도 과하게 안 튀어나오게
+      statusLight.add(ball);
+      // 반짝임 2개: 왼쪽 위 큰 것 + 오른쪽 아래 작은 것 (애니메 눈 문법)
+      const sparkleBig = new THREE.Mesh(hiBigGeo, hiMat);
+      sparkleBig.position.set(
+        pivot.x - EYE_RADIUS * 0.32,
+        cy + EYE_RADIUS * 0.36,
+        cz + EYE_RADIUS * 0.5,
+      );
+      statusLight.add(sparkleBig);
+      const sparkleSmall = new THREE.Mesh(hiSmallGeo, hiMat);
+      sparkleSmall.position.set(
+        pivot.x + EYE_RADIUS * 0.3,
+        cy - EYE_RADIUS * 0.22,
+        cz + EYE_RADIUS * 0.55,
+      );
+      statusLight.add(sparkleSmall);
+    }
+  }
+
+  // ── 코: 가운데 점을 30%로 — 뭉툭함을 덜어낸 점코
   shrinkAboutPivot(nose, noseCenter, NOSE_SCALE);
 
-  // 입: 코 아래에 스마일 아크(토러스 일부)를 새로 만들어 붙인다.
-  // 폭 = 원본 'o' × MOUTH_SCALE. 호가 원 아래쪽에 오도록 돌리면 ∪(스마일).
-  const arc = 1.8; // 호의 각도(rad) — 클수록 활짝 웃는 입
-  const width = 0.03 * MOUTH_SCALE;
-  const radius = width / (2 * Math.sin(arc / 2));
+  // ── 입: 도톰한 스마일 아크(토러스 일부). 호가 원 아래쪽에 오도록 돌리면 ∪
+  const arc = 2.0; // 호의 각도(rad) — 클수록 활짝 웃는 입
+  const radius = MOUTH_WIDTH / (2 * Math.sin(arc / 2));
   const mouth = new THREE.Mesh(
     // (반지름, 선 굵기, 단면 분할, 호 분할, 호 각도) — 로우폴리 유지
-    new THREE.TorusGeometry(radius, 0.0045, 6, 14, arc),
+    new THREE.TorusGeometry(radius, MOUTH_THICK, 8, 16, arc),
     nose.material,
   );
   mouth.rotation.z = -Math.PI / 2 - arc / 2; // 호를 원의 맨 아래로
-  // 호의 최하단이 코보다 살짝 아래(-0.024)에 오도록 토러스 중심을 배치
-  mouth.position.set(0, noseCenter.y - 0.024 + radius, noseFrontZ - 0.001);
+  // 호의 최하단이 코보다 살짝 아래(-0.02)에 오도록 토러스 중심을 배치
+  mouth.position.set(0, noseCenter.y - 0.02 + radius, faceZ - 0.002);
   body.add(mouth);
 }
 
@@ -327,7 +358,8 @@ function PetModel({ petting, burstNonce }: Satellite3DProps) {
 export default function Satellite3D(props: Satellite3DProps) {
   return (
     <Canvas
-      camera={{ fov: 42, position: [0.35, 0.3, 1.6], near: 0.05, far: 50 }}
+      // 거의 정면에서 살짝 위 — 얼굴(눈·입)이 가장 사랑스럽게 보이는 각도
+      camera={{ fov: 42, position: [0.16, 0.14, 1.55], near: 0.05, far: 50 }}
       dpr={[1, 2]}
       gl={{ antialias: true, alpha: true }}
       onCreated={({ camera }) => camera.lookAt(0, 0, 0)}
