@@ -26,6 +26,19 @@ export const DURABILITY_FLOOR = 30;
 /** 데이터 용량이 꽉 찼을 때의 수집 효율 — 기획서: 50% 감소 */
 export const FULL_DATA_EFFICIENCY = 0.5;
 
+/**
+ * 무드 — 서버 정산이 내려주는 '방치의 감정 상태'.
+ * sleep(절전)은 여기 없다: 배터리 0에서 파생되는 상태라 저장하지 않는다
+ * ("원본은 하나만 저장" 원칙). 무드는 클라이언트에서 쓰다듬기로 풀리며,
+ * 다음 정산 때 서버가 다시 계산한다.
+ */
+export type PetMood = "active" | "sulky" | "hibernate";
+
+/** 동면에서 깨어나는 데 필요한 쓰다듬기 횟수 — "천천히 깨워 주세요" */
+export const HIBERNATE_WAKE_STROKES = 8;
+/** 시무룩이 풀리는 데 필요한 쓰다듬기 횟수 */
+export const SULKY_CHEER_STROKES = 4;
+
 /** 값을 [min, max] 범위로 잘라내는 유틸 (파이썬의 max(min(v, hi), lo)) */
 const clamp = (value: number, min = 0, max = GAUGE_MAX) =>
   Math.min(max, Math.max(min, value));
@@ -41,10 +54,14 @@ interface PetState {
   debris: number;
   /** 경험치 — 진화(1~3단계) 시스템의 재료 */
   exp: number;
+  /** 무드 — 시무룩/동면은 쓰다듬기로 풀어준다 */
+  mood: PetMood;
+  /** 현재 무드를 푸는 데 쌓인 쓰다듬기 횟수 */
+  moodProgress: number;
 
   /** [Tap] 파편 냠냠 — 자원 획득, 데이터가 쌓이고 배터리를 조금 쓴다 */
   eatDebris: () => void;
-  /** [Drag] 쓰다듬기 — 내구도 수리 + 교감 */
+  /** [Drag] 쓰다듬기 — 내구도 수리 + 교감 (시무룩 달래기 · 동면 깨우기도 겸한다) */
   soothe: () => void;
   /** 기지국으로 데이터 전송 — 데이터 용량 비우기 */
   transmitData: () => void;
@@ -52,8 +69,12 @@ interface PetState {
   chargeSolar: () => void;
   /** 실시간 틱 — 궤도를 도는 동안 배터리가 자연 소모된다 */
   tickIdle: () => void;
-  /** 서버 정산 결과로 상태 덮어쓰기 — DB 컬럼명(snake_case)을 여기서 번역한다 */
-  hydrateFromServer: (pet: PetRow) => void;
+  /**
+   * 서버 정산 결과로 상태 덮어쓰기 — DB 컬럼명(snake_case)을 여기서 번역한다.
+   * keepMood: 정산이 없었던 부팅에서는 서버 status가 낡은 값이므로
+   * localStorage에 남아 있던 무드를 유지한다.
+   */
+  hydrateFromServer: (pet: PetRow, options?: { keepMood?: boolean }) => void;
 }
 
 export const usePetStore = create<PetState>()(
@@ -65,9 +86,13 @@ export const usePetStore = create<PetState>()(
       dataUsed: 40,
       debris: 0,
       exp: 0,
+      mood: "active",
+      moodProgress: 0,
 
       eatDebris: () =>
         set((state) => {
+          // 동면 중엔 시스템이 잠겨 있다 — 먼저 쓰다듬어 깨워야 한다
+          if (state.mood === "hibernate") return state;
           // 절전 모드(배터리 0)에서는 먹지 못한다 — 충전이 먼저!
           if (state.battery <= 0) return state;
           const efficiency =
@@ -81,26 +106,60 @@ export const usePetStore = create<PetState>()(
         }),
 
       soothe: () =>
-        set((state) => ({
-          durability: clamp(state.durability + 2),
-          exp: state.exp + 1,
-        })),
+        set((state) => {
+          // 동면: 쓰다듬기는 오직 '깨우기'로만 작동한다 — 보상은 깨어난 뒤부터
+          if (state.mood === "hibernate") {
+            const progress = state.moodProgress + 1;
+            return progress >= HIBERNATE_WAKE_STROKES
+              ? { mood: "active" as PetMood, moodProgress: 0 }
+              : { moodProgress: progress };
+          }
+          // 시무룩: 쓰다듬을수록 기분이 풀린다 (수리·교감 보상은 그대로)
+          if (state.mood === "sulky") {
+            const progress = state.moodProgress + 1;
+            return {
+              durability: clamp(state.durability + 2),
+              exp: state.exp + 1,
+              ...(progress >= SULKY_CHEER_STROKES
+                ? { mood: "active" as PetMood, moodProgress: 0 }
+                : { moodProgress: progress }),
+            };
+          }
+          return {
+            durability: clamp(state.durability + 2),
+            exp: state.exp + 1,
+          };
+        }),
 
-      transmitData: () => set({ dataUsed: 0 }),
+      transmitData: () =>
+        set((state) => (state.mood === "hibernate" ? state : { dataUsed: 0 })),
 
       chargeSolar: () =>
-        set((state) => ({ battery: clamp(state.battery + 18) })),
+        set((state) =>
+          state.mood === "hibernate"
+            ? state
+            : { battery: clamp(state.battery + 18) },
+        ),
 
       tickIdle: () =>
         set((state) => ({ battery: clamp(state.battery - 1) })),
 
-      hydrateFromServer: (pet) =>
+      hydrateFromServer: (pet, options) =>
         set({
           battery: Number(pet.battery),
           durability: Number(pet.durability),
           dataUsed: Number(pet.data_used),
           debris: Number(pet.debris),
           exp: pet.exp,
+          ...(options?.keepMood
+            ? {}
+            : {
+                mood:
+                  pet.status === "sulky" || pet.status === "hibernate"
+                    ? pet.status
+                    : ("active" as PetMood),
+                moodProgress: 0,
+              }),
         }),
     }),
     {
@@ -113,6 +172,8 @@ export const usePetStore = create<PetState>()(
         dataUsed: state.dataUsed,
         debris: state.debris,
         exp: state.exp,
+        mood: state.mood,
+        moodProgress: state.moodProgress,
       }),
     },
   ),

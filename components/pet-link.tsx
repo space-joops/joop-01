@@ -62,7 +62,13 @@ export default function PetLink({ onSettlement }: PetLinkProps) {
         if (!result.ok) console.warn("[관제 링크] 부팅 실패:", result.reason);
         return;
       }
-      usePetStore.getState().hydrateFromServer(result.pet);
+      // 정산이 없었던 부팅(부재 60초 미만)에서는 서버 status가 낡은 값일 수
+      // 있으므로, localStorage에 살아 있는 무드(시무룩/동면)를 유지한다
+      usePetStore
+        .getState()
+        .hydrateFromServer(result.pet, {
+          keepMood: !result.settlement?.settled,
+        });
       dirty.current = false; // hydrate로 인한 변경은 동기화 대상이 아니다
       linked.current = true;
 

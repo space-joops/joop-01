@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { usePetStore, isSleeping, isDataFull } from "@/stores/pet-store";
+import {
+  usePetStore,
+  isSleeping,
+  isDataFull,
+  HIBERNATE_WAKE_STROKES,
+  SULKY_CHEER_STROKES,
+} from "@/stores/pet-store";
 import { APP_VERSION } from "@/lib/pwa";
 import StatusGauges from "@/components/home/status-gauges";
 import PetSatellite from "@/components/home/pet-satellite";
@@ -31,11 +37,14 @@ export default function HomeScreen() {
   const dataUsed = usePetStore((state) => state.dataUsed);
   const debris = usePetStore((state) => state.debris);
   const exp = usePetStore((state) => state.exp);
+  const mood = usePetStore((state) => state.mood);
+  const moodProgress = usePetStore((state) => state.moodProgress);
   const chargeSolar = usePetStore((state) => state.chargeSolar);
   const transmitData = usePetStore((state) => state.transmitData);
 
   const sleeping = isSleeping(battery);
   const dataFull = isDataFull(dataUsed);
+  const hibernating = mood === "hibernate";
 
   // 관제 설정 시트 (알림 · 설치 · 버전 정보)
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -49,14 +58,28 @@ export default function HomeScreen() {
     return () => clearInterval(timer);
   }, []);
 
-  // 펫의 지금 기분/상황을 한 줄로 알려주는 상태 메시지
-  const statusMessage = sleeping
-    ? "절전 모드예요… ☀️ 태양광 충전이 필요해요"
-    : dataFull
-      ? "데이터가 꽉 찼어요! 📡 기지국으로 전송해 주세요"
-      : battery <= 15
-        ? "배터리가 얼마 남지 않았어요… 🔋"
-        : "궤도를 순항하며 파편을 줍는 중 ✨";
+  // 개발 중 무드 연출 확인용: ?mood=hibernate | sulky (프로덕션에선 무시)
+  useEffect(() => {
+    if (process.env.NODE_ENV === "production") return;
+    const forced = new URLSearchParams(window.location.search).get("mood");
+    if (forced === "hibernate" || forced === "sulky") {
+      usePetStore.setState({ mood: forced, moodProgress: 0 });
+    }
+  }, []);
+
+  // 펫의 지금 기분/상황을 한 줄로 알려주는 상태 메시지.
+  // 우선순위: 동면(모든 시스템 잠김) > 절전 > 시무룩 > 데이터 > 배터리 경고
+  const statusMessage = hibernating
+    ? `동면 중이에요… 🧊 부드럽게 쓰다듬어 깨워 주세요 (${moodProgress}/${HIBERNATE_WAKE_STROKES})`
+    : sleeping
+      ? "절전 모드예요… ☀️ 태양광 충전이 필요해요"
+      : mood === "sulky"
+        ? `오래 기다려서 시무룩해요… 🥺 쓰다듬어 주세요 (${moodProgress}/${SULKY_CHEER_STROKES})`
+        : dataFull
+          ? "데이터가 꽉 찼어요! 📡 기지국으로 전송해 주세요"
+          : battery <= 15
+            ? "배터리가 얼마 남지 않았어요… 🔋"
+            : "궤도를 순항하며 파편을 줍는 중 ✨";
 
   return (
     <main className="flex h-full flex-col gap-3 p-4 pt-[max(1rem,env(safe-area-inset-top))]">
@@ -119,7 +142,7 @@ export default function HomeScreen() {
         <button
           type="button"
           onClick={chargeSolar}
-          disabled={battery >= 100}
+          disabled={battery >= 100 || hibernating}
           className="flex-1 rounded-2xl border border-panel-border bg-panel py-3.5 text-sm font-semibold transition active:scale-95 disabled:opacity-40"
         >
           ☀️ 태양광 충전
@@ -127,7 +150,7 @@ export default function HomeScreen() {
         <button
           type="button"
           onClick={transmitData}
-          disabled={dataUsed === 0}
+          disabled={dataUsed === 0 || hibernating}
           className={`flex-1 rounded-2xl border py-3.5 text-sm font-semibold transition active:scale-95 disabled:opacity-40 ${
             dataFull
               ? "animate-pulse border-danger/60 bg-danger/20"

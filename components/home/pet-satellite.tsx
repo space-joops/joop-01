@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import type { PointerEvent } from "react";
-import { usePetStore, isSleeping } from "@/stores/pet-store";
+import { usePetStore, isSleeping, type PetMood } from "@/stores/pet-store";
 
 /**
  * 위성 펫 (임시 2D SVG 버전).
@@ -40,10 +40,12 @@ interface PointerTrack {
 
 export default function PetSatellite() {
   const battery = usePetStore((state) => state.battery);
+  const mood = usePetStore((state) => state.mood);
   const eatDebris = usePetStore((state) => state.eatDebris);
   const soothe = usePetStore((state) => state.soothe);
 
   const sleeping = isSleeping(battery);
+  const hibernating = mood === "hibernate";
 
   const containerRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<PointerTrack | null>(null);
@@ -103,8 +105,13 @@ export default function PetSatellite() {
       while (track.strokeGauge >= STROKE_STEP) {
         track.strokeGauge -= STROKE_STEP;
         soothe();
-        flashHappy();
-        spawnParticle("💚", event.clientX, event.clientY);
+        // 동면 깨우기 중엔 온기(💗)가, 평소엔 수리(💚)가 피어오른다
+        if (hibernating) {
+          spawnParticle("💗", event.clientX, event.clientY);
+        } else {
+          flashHappy();
+          spawnParticle("💚", event.clientX, event.clientY);
+        }
       }
     }
   };
@@ -118,6 +125,11 @@ export default function PetSatellite() {
     const isTap = track.totalMove <= TAP_MAX_MOVE && elapsed <= TAP_MAX_DURATION;
     if (!isTap) return;
 
+    if (hibernating) {
+      // 동면: 탭으로는 깨어나지 않는다 — 쓰다듬어 달라는 신호만
+      spawnParticle("❄️", event.clientX, event.clientY);
+      return;
+    }
     if (sleeping) {
       // 절전 모드: 먹일 수 없다 — 잠꼬대만 한다
       spawnParticle("💤", event.clientX, event.clientY);
@@ -138,9 +150,17 @@ export default function PetSatellite() {
       role="button"
       aria-label="위성 펫 — 탭하면 파편을 먹고, 문지르면 수리돼요"
     >
-      {/* 위성 본체 (절전 중엔 둥실거림도 멈춘다) */}
-      <div className={sleeping ? "opacity-70" : "animate-pet-float"}>
-        <SatelliteSvg sleeping={sleeping} happy={happy} />
+      {/* 위성 본체 — 동면: 얼어붙어 채도까지 잃는다 / 절전: 둥실거림만 멈춘다 */}
+      <div
+        className={
+          hibernating
+            ? "opacity-60 saturate-[0.35] transition-all duration-700"
+            : sleeping
+              ? "opacity-70"
+              : "animate-pet-float"
+        }
+      >
+        <SatelliteSvg sleeping={sleeping} happy={happy} mood={mood} />
       </div>
 
       {/* 터치 피드백 파티클 레이어 */}
@@ -155,11 +175,17 @@ export default function PetSatellite() {
         </span>
       ))}
 
-      {/* 절전 모드 표시 */}
-      {sleeping && (
+      {/* 상태 표시 — 동면이 절전보다 우선 (동면이면 배터리도 0이므로) */}
+      {hibernating ? (
         <span className="pointer-events-none absolute right-[18%] top-[22%] animate-pulse text-3xl">
-          💤
+          ❄️
         </span>
+      ) : (
+        sleeping && (
+          <span className="pointer-events-none absolute right-[18%] top-[22%] animate-pulse text-3xl">
+            💤
+          </span>
+        )
       )}
     </div>
   );
@@ -169,20 +195,39 @@ export default function PetSatellite() {
 function SatelliteSvg({
   sleeping,
   happy,
+  mood,
 }: {
   sleeping: boolean;
   happy: boolean;
+  mood: PetMood;
 }) {
+  const hibernating = mood === "hibernate";
+  // 표정 우선순위: 동면(꽁꽁) > 행복(쓰다듬는 순간) > 절전 > 시무룩 > 평상시
+  const face = hibernating
+    ? "closed"
+    : happy
+      ? "happy"
+      : sleeping
+        ? "closed"
+        : mood === "sulky"
+          ? "sulky"
+          : "normal";
+
   return (
     <svg
       viewBox="0 0 220 170"
       className="w-64 drop-shadow-[0_0_24px_rgba(129,140,248,0.35)]"
       aria-hidden
     >
-      {/* 안테나 — 끝의 램프는 상태등 (정상: 초록 / 절전: 빨강) */}
+      {/* 안테나 — 끝의 램프는 상태등 (정상: 초록 / 절전: 빨강 / 동면: 얼음빛) */}
       <line x1="110" y1="30" x2="110" y2="56" stroke="#8b93bd" strokeWidth="4" />
-      <circle cx="110" cy="24" r="7" fill={sleeping ? "#f87171" : "#34d399"}>
-        {!sleeping && (
+      <circle
+        cx="110"
+        cy="24"
+        r="7"
+        fill={hibernating ? "#7dd3fc" : sleeping ? "#f87171" : "#34d399"}
+      >
+        {!sleeping && !hibernating && (
           <animate
             attributeName="opacity"
             values="1;0.4;1"
@@ -245,17 +290,31 @@ function SatelliteSvg({
       />
 
       {/* 얼굴 */}
-      {sleeping ? (
-        // 절전: 지그시 감은 눈
+      {face === "closed" ? (
+        // 절전·동면: 지그시 감은 눈
         <g stroke="#1f2547" strokeWidth="3.5" strokeLinecap="round" fill="none">
           <path d="M88 84 q6 5 12 0" />
           <path d="M120 84 q6 5 12 0" />
         </g>
-      ) : happy ? (
+      ) : face === "happy" ? (
         // 행복: ∪∪ 웃는 눈
         <g stroke="#1f2547" strokeWidth="3.5" strokeLinecap="round" fill="none">
           <path d="M88 86 q6 -7 12 0" />
           <path d="M120 86 q6 -7 12 0" />
+        </g>
+      ) : face === "sulky" ? (
+        // 시무룩: 눈꼬리가 처진 반달 눈 + 그렁그렁 눈물 한 방울
+        <g>
+          <g
+            stroke="#1f2547"
+            strokeWidth="3.5"
+            strokeLinecap="round"
+            fill="none"
+          >
+            <path d="M88 81 q6 6 12 3" />
+            <path d="M132 81 q-6 6 -12 3" />
+          </g>
+          <circle cx="99" cy="92" r="2.6" fill="#7dd3fc" opacity="0.9" />
         </g>
       ) : (
         // 평상시: 동그란 눈
@@ -265,19 +324,34 @@ function SatelliteSvg({
         </g>
       )}
 
-      {/* 볼터치 */}
-      <circle cx="85" cy="97" r="5" fill="#f9a8d4" opacity="0.6" />
-      <circle cx="135" cy="97" r="5" fill="#f9a8d4" opacity="0.6" />
+      {/* 볼터치 — 동면 중엔 혈색도 옅어진다 */}
+      <circle cx="85" cy="97" r="5" fill="#f9a8d4" opacity={hibernating ? 0.25 : 0.6} />
+      <circle cx="135" cy="97" r="5" fill="#f9a8d4" opacity={hibernating ? 0.25 : 0.6} />
 
-      {/* 입 */}
-      {!sleeping && (
+      {/* 입 — 시무룩할 땐 뿌루퉁하게 뒤집힌다 */}
+      {face !== "closed" && (
         <path
-          d={happy ? "M104 100 q6 8 12 0" : "M106 101 q4 4 8 0"}
+          d={
+            face === "happy"
+              ? "M104 100 q6 8 12 0"
+              : face === "sulky"
+                ? "M104 104 q6 -6 12 0"
+                : "M106 101 q4 4 8 0"
+          }
           stroke="#1f2547"
           strokeWidth="3"
           strokeLinecap="round"
           fill="none"
         />
+      )}
+
+      {/* 동면: 몸에 내려앉은 성에 */}
+      {hibernating && (
+        <g fill="#bae6fd" opacity="0.85">
+          <path d="M80 62 l2.5 5 5 2.5 -5 2.5 -2.5 5 -2.5 -5 -5 -2.5 5 -2.5 Z" />
+          <path d="M138 112 l2 4 4 2 -4 2 -2 4 -2 -4 -4 -2 4 -2 Z" />
+          <path d="M126 60 l1.5 3 3 1.5 -3 1.5 -1.5 3 -1.5 -3 -3 -1.5 3 -1.5 Z" />
+        </g>
       )}
     </svg>
   );
