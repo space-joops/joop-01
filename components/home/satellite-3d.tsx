@@ -24,6 +24,65 @@ import {
 
 const MODEL_URL = "/models/pet_stage1_baby.glb";
 
+/* ── 성형 튜닝 (오퍼레이터 피드백 반영) ──────────────────────────
+ * 원본 에셋 대비: 전체 크기 70%, 눈 50%, 코(입 자리의 'o') 40%.
+ * 지오메트리 수정 없이 노드 스케일로 처리한다 — 피벗(눈알 중심)을
+ * 기준으로 줄여야 하이라이트·속눈썹이 눈알 안에 그대로 남는다.
+ */
+const PET_SHRINK = 0.7;
+const EYE_SCALE = 0.5;
+const NOSE_SCALE = 0.4;
+
+/**
+ * 메시를 지정한 피벗 기준으로 s배 축소한다.
+ * 원리: 정점 v의 최종 위치 = v×s + pivot×(1-s) → pivot은 제자리에 남고
+ * 나머지가 피벗 쪽으로 모여든다 (스케일의 중심 이동 공식).
+ */
+function shrinkAboutPivot(mesh: THREE.Mesh, pivot: THREE.Vector3, s: number) {
+  mesh.scale.setScalar(s);
+  mesh.position.copy(pivot).multiplyScalar(1 - s);
+}
+
+/** 얼굴 성형 — GLTF 캐시가 재사용되므로 두 번 적용되지 않게 표식을 남긴다 */
+function applyFaceTweaks(scene: THREE.Group, nodes: Record<string, unknown>) {
+  if (scene.userData.faceTweaked) return;
+  scene.userData.faceTweaked = true;
+
+  const centerOf = (mesh: THREE.Mesh) => {
+    mesh.geometry.computeBoundingBox();
+    return mesh.geometry.boundingBox!.getCenter(new THREE.Vector3());
+  };
+
+  // 눈: StatusLight 아래 메시들을 좌/우로 나눠, 같은 쪽 눈알 중심을 피벗으로 축소
+  const statusLight = nodes.StatusLight as THREE.Object3D | undefined;
+  if (statusLight) {
+    const meshes: THREE.Mesh[] = [];
+    statusLight.traverse((o) => {
+      if ((o as THREE.Mesh).isMesh) meshes.push(o as THREE.Mesh);
+    });
+    const pivots = new Map<number, THREE.Vector3>(); // 키: 좌(-1)/우(+1)
+    for (const m of meshes) {
+      if ((m.material as THREE.Material).name === "eye") {
+        const c = centerOf(m);
+        pivots.set(Math.sign(c.x), c);
+      }
+    }
+    for (const m of meshes) {
+      const pivot = pivots.get(Math.sign(centerOf(m).x));
+      if (pivot) shrinkAboutPivot(m, pivot, EYE_SCALE);
+    }
+  }
+
+  // 코('o'): Body 직속 자식 중 mouth 머티리얼 메시 — 제 중심 기준으로 축소
+  const body = nodes.Body as THREE.Object3D | undefined;
+  const nose = body?.children.find(
+    (o) =>
+      (o as THREE.Mesh).isMesh &&
+      ((o as THREE.Mesh).material as THREE.Material).name === "mouth",
+  ) as THREE.Mesh | undefined;
+  if (nose) shrinkAboutPivot(nose, centerOf(nose), NOSE_SCALE);
+}
+
 /** 연출용 감정 상태 — 스토어의 무드·게이지에서 파생된다 */
 type Emotion =
   | "normal"
@@ -93,7 +152,10 @@ function PetModel({ petting, burstNonce }: Satellite3DProps) {
     const box = new THREE.Box3().setFromObject(scene);
     const center = box.getCenter(new THREE.Vector3());
     const size = box.getSize(new THREE.Vector3());
-    const scale = 1.15 / Math.max(size.x, size.y, size.z);
+    const scale = (1.15 / Math.max(size.x, size.y, size.z)) * PET_SHRINK;
+
+    // 눈·코 성형은 프레이밍 측정 후에 적용 (외곽 크기에 영향 없음)
+    applyFaceTweaks(scene, nodes as Record<string, unknown>);
     return {
       tips: [grab("Antenna_Tip")].filter(Boolean).map((t, i) => ({
         ...t!,
