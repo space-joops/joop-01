@@ -105,6 +105,15 @@ create index joop_01_offline_logs_user_created_idx
 -- pets에 update/delete grant를 아예 주지 않으므로, RLS 정책 이전에
 -- 권한 레벨에서 이미 직접 수정이 차단된다. 쓰기는 security definer
 -- 함수(소유자 권한으로 실행)만 가능하다.
+--
+-- 주의: 클라우드 Supabase는 default privileges로 새 테이블의 모든 권한을
+-- anon/authenticated에 자동 부여한다 (로컬 CLI는 안 그럼!).
+-- 그래서 "전부 회수 → 최소한만 다시 부여" 순서로 명시해야
+-- 로컬과 클라우드의 권한 상태가 같아진다.
+revoke all on public.joop_01_pets         from anon, authenticated;
+revoke all on public.joop_01_profiles     from anon, authenticated;
+revoke all on public.joop_01_offline_logs from anon, authenticated;
+
 grant select, insert         on public.joop_01_pets         to authenticated;
 grant select, update         on public.joop_01_profiles     to authenticated;
 grant select                 on public.joop_01_offline_logs to authenticated;
