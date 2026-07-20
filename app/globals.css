@@ -1,26 +1,101 @@
 @import "tailwindcss";
 
+/*
+ * 줍스(JOOPS) 전역 테마
+ * 게임 무대가 우주이므로 라이트/다크 모드 분기 없이 항상 어두운 우주 톤을 사용한다.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #060714; /* 깊은 우주 남색 */
+  --foreground: #e8eaf6;
+  --panel: #11132a; /* 관제 콘솔 패널 배경 */
+  --panel-border: #23264a;
+  --accent-battery: #fbbf24; /* 배터리(포만감) — 호박색 */
+  --accent-durability: #34d399; /* 내구도(건강) — 에메랄드 */
+  --accent-data: #818cf8; /* 데이터(스트레스) — 인디고 */
+  --accent-danger: #f87171; /* 경고 */
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-panel: var(--panel);
+  --color-panel-border: var(--panel-border);
+  --color-battery: var(--accent-battery);
+  --color-durability: var(--accent-durability);
+  --color-data: var(--accent-data);
+  --color-danger: var(--accent-danger);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html,
+body {
+  height: 100%;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), "Apple SD Gothic Neo", "Noto Sans KR",
+    sans-serif;
+  /* 모바일에서 화면을 아래로 당겨도 새로고침(pull-to-refresh)되지 않게 */
+  overscroll-behavior-y: none;
+  /* 터치할 때 뜨는 파란 하이라이트 제거 — 게임 화면에선 몰입을 깨는 요소 */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/*
+ * 게임 상호작용 영역 공통 클래스.
+ * 길게 눌러도 텍스트 선택·컨텍스트 메뉴가 뜨지 않고,
+ * touch-action: none 으로 브라우저의 기본 스크롤/줌 대신
+ * 우리가 Pointer 이벤트로 제스처를 직접 처리한다.
+ */
+.touch-game {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: none;
+}
+
+/* 펫이 궤도 위에서 둥실둥실 떠 있는 느낌 */
+@keyframes pet-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+.animate-pet-float {
+  animation: pet-float 3.2s ease-in-out infinite;
+}
+
+/* 배경 별 반짝임 — 별마다 --twinkle-duration 으로 주기를 다르게 준다 */
+@keyframes star-twinkle {
+  0%,
+  100% {
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.animate-star-twinkle {
+  animation: star-twinkle var(--twinkle-duration, 2.4s) ease-in-out infinite;
+}
+
+/* 터치 피드백 이모지 파티클 — 위로 떠오르며 사라진다 */
+@keyframes particle-rise {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(0.8);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% - 72px)) scale(1.35);
+  }
+}
+.animate-particle-rise {
+  animation: particle-rise 0.9s ease-out forwards;
 }
