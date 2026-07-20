@@ -21,10 +21,18 @@ npx supabase stop      # 종료
 
 1. [supabase.com](https://supabase.com)에서 프로젝트 생성 (무료 티어 충분)
 2. **Authentication → Sign In / Providers → Anonymous sign-ins 켜기** (잊기 쉬움!)
-3. 마이그레이션 적용 — 둘 중 하나:
+3. 프로젝트에 예전 실험용 테이블이 남아 있다면 먼저 정리 (반드시 내용 확인 후!):
+   ```sql
+   drop table if exists public.pets cascade;
+   drop trigger if exists on_auth_user_created on auth.users;
+   drop function if exists public.handle_new_user();
+   ```
+4. 마이그레이션 적용 — 둘 중 하나:
    - 대시보드 SQL Editor에 `migrations/20260721000000_joops_init.sql` 붙여넣고 실행
-   - 또는 CLI: `npx supabase link --project-ref <ref>` 후 `npx supabase db push`
-4. Vercel 환경변수에 프로젝트의 URL/anon key 등록 (`.env.example` 참조)
+   - 또는 CLI: `npx supabase login` 후 `npx supabase link --project-ref <ref>` → `npx supabase db push`
+5. Vercel 환경변수에 프로젝트 URL과 키 등록 (`.env.example` 참조).
+   키는 신형(`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `sb_publishable_…`)과
+   구형(`NEXT_PUBLIC_SUPABASE_ANON_KEY`, JWT) 어느 쪽이든 인식한다.
 
 ## 스키마 개요
 

@@ -2,7 +2,7 @@ import { createBrowserClient } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   SUPABASE_URL,
-  SUPABASE_ANON_KEY,
+  SUPABASE_PUBLIC_KEY,
   isSupabaseConfigured,
 } from "@/lib/supabase/env";
 
@@ -20,6 +20,6 @@ let browserClient: SupabaseClient | null = null;
 export function getSupabaseBrowserClient(): SupabaseClient | null {
   if (!isSupabaseConfigured) return null;
   // 모듈 스코프 싱글톤 — 어디서 몇 번을 불러도 연결은 하나
-  browserClient ??= createBrowserClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  browserClient ??= createBrowserClient(SUPABASE_URL, SUPABASE_PUBLIC_KEY);
   return browserClient;
 }

@@ -3,7 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   SUPABASE_URL,
-  SUPABASE_ANON_KEY,
+  SUPABASE_PUBLIC_KEY,
   isSupabaseConfigured,
 } from "@/lib/supabase/env";
 
@@ -20,7 +20,7 @@ export async function getSupabaseServerClient(): Promise<SupabaseClient | null> 
   // Next.js 15부터 cookies()는 비동기 — await가 필요하다
   const cookieStore = await cookies();
 
-  return createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  return createServerClient(SUPABASE_URL, SUPABASE_PUBLIC_KEY, {
     cookies: {
       getAll() {
         return cookieStore.getAll();

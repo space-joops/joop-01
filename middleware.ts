@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import {
   SUPABASE_URL,
-  SUPABASE_ANON_KEY,
+  SUPABASE_PUBLIC_KEY,
   isSupabaseConfigured,
 } from "@/lib/supabase/env";
 
@@ -21,7 +21,7 @@ export async function middleware(request: NextRequest) {
 
   let response = NextResponse.next({ request });
 
-  const supabase = createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  const supabase = createServerClient(SUPABASE_URL, SUPABASE_PUBLIC_KEY, {
     cookies: {
       getAll() {
         return request.cookies.getAll();
