@@ -9,6 +9,9 @@
 /** 펫 상태 — 사망은 없다 (기획서 원칙) */
 export type PetStatus = "active" | "sulky" | "sleep" | "hibernate";
 
+/** 3단계 진화 장비 분기 — 한 번 고르면 바꿀 수 없다 */
+export type PetVariant = "net" | "magnet" | "laser";
+
 /** public.joop_01_pets 테이블 한 행 */
 export interface PetRow {
   id: string;
@@ -21,9 +24,20 @@ export interface PetRow {
   debris: number;
   exp: number;
   status: PetStatus;
+  /** 3단계 장비 — 1~2단계는 null */
+  variant: PetVariant | null;
   last_settled_at: string;
   created_at: string;
   updated_at: string;
+}
+
+/** joop_01_evolve_pet() RPC가 돌려주는 승급 결과 */
+export interface EvolveResult {
+  ok: boolean;
+  reason?: "exp_low" | "variant_required" | "max_level";
+  /** exp_low일 때 필요한 경험치 */
+  need?: number;
+  pet?: PetRow;
 }
 
 /** joop_01_settle_offline() RPC가 돌려주는 정산 결과 */

@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { PetRow } from "@/lib/supabase/types";
+import type { PetRow, PetVariant } from "@/lib/supabase/types";
 
 /**
  * 펫(위성) 3대 상태 지표 스토어 — 게임의 두뇌.
@@ -39,6 +39,19 @@ export const HIBERNATE_WAKE_STROKES = 8;
 /** 시무룩이 풀리는 데 필요한 쓰다듬기 횟수 */
 export const SULKY_CHEER_STROKES = 4;
 
+/**
+ * 진화 임계값 — 진실은 DB 함수(joop_01_evolve_pet)에 있고,
+ * 이 상수는 UI 표시·로컬 모드 폴백용 미러다. 값을 바꾸면 양쪽 모두 바꿀 것.
+ */
+export const EVOLVE_EXP: Record<2 | 3, number> = { 2: 300, 3: 1200 };
+
+/** 지금 진화할 수 있나 — 다음 목표 레벨을 돌려준다 (불가하면 null) */
+export const evolveTarget = (level: number, exp: number): 2 | 3 | null => {
+  if (level === 1 && exp >= EVOLVE_EXP[2]) return 2;
+  if (level === 2 && exp >= EVOLVE_EXP[3]) return 3;
+  return null;
+};
+
 /** 값을 [min, max] 범위로 잘라내는 유틸 (파이썬의 max(min(v, hi), lo)) */
 const clamp = (value: number, min = 0, max = GAUGE_MAX) =>
   Math.min(max, Math.max(min, value));
@@ -54,6 +67,10 @@ interface PetState {
   debris: number;
   /** 경험치 — 진화(1~3단계) 시스템의 재료 */
   exp: number;
+  /** 진화 단계 1~3 — 승급은 서버 RPC(또는 로컬 모드 폴백)로만 */
+  level: number;
+  /** 3단계 장비 분기 — 1~2단계는 null */
+  variant: PetVariant | null;
   /** 무드 — 시무룩/동면은 쓰다듬기로 풀어준다 */
   mood: PetMood;
   /** 현재 무드를 푸는 데 쌓인 쓰다듬기 횟수 */
@@ -69,6 +86,11 @@ interface PetState {
   chargeSolar: () => void;
   /** 실시간 틱 — 궤도를 도는 동안 배터리가 자연 소모된다 */
   tickIdle: () => void;
+  /**
+   * 로컬 모드 전용 진화 — Supabase 미설정일 때만 쓰는 폴백.
+   * 서버 연동 시엔 evolvePet 액션 결과를 hydrateFromServer로 반영한다.
+   */
+  evolveLocal: (variant: PetVariant | null) => void;
   /**
    * 서버 정산 결과로 상태 덮어쓰기 — DB 컬럼명(snake_case)을 여기서 번역한다.
    * keepMood: 정산이 없었던 부팅에서는 서버 status가 낡은 값이므로
@@ -86,6 +108,8 @@ export const usePetStore = create<PetState>()(
       dataUsed: 40,
       debris: 0,
       exp: 0,
+      level: 1,
+      variant: null,
       mood: "active",
       moodProgress: 0,
 
@@ -144,6 +168,14 @@ export const usePetStore = create<PetState>()(
       tickIdle: () =>
         set((state) => ({ battery: clamp(state.battery - 1) })),
 
+      evolveLocal: (variant) =>
+        set((state) => {
+          const target = evolveTarget(state.level, state.exp);
+          if (target === 2) return { level: 2 };
+          if (target === 3 && variant) return { level: 3, variant };
+          return state;
+        }),
+
       hydrateFromServer: (pet, options) =>
         set({
           battery: Number(pet.battery),
@@ -151,6 +183,8 @@ export const usePetStore = create<PetState>()(
           dataUsed: Number(pet.data_used),
           debris: Number(pet.debris),
           exp: pet.exp,
+          level: pet.level,
+          variant: pet.variant ?? null,
           ...(options?.keepMood
             ? {}
             : {
@@ -172,6 +206,8 @@ export const usePetStore = create<PetState>()(
         dataUsed: state.dataUsed,
         debris: state.debris,
         exp: state.exp,
+        level: state.level,
+        variant: state.variant,
         mood: state.mood,
         moodProgress: state.moodProgress,
       }),
