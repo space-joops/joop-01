@@ -1,0 +1,38 @@
+/**
+ * DB 행(row) ↔ TypeScript 타입 대응.
+ *
+ * Supabase CLI로 타입을 자동 생성할 수도 있지만(supabase gen types),
+ * 지금은 테이블이 작으니 손으로 써서 컬럼 하나하나를 눈에 익힌다.
+ * 파이썬으로 치면 SQLAlchemy 모델 대신 TypedDict를 직접 쓰는 셈.
+ */
+
+/** 펫 상태 — 사망은 없다 (기획서 원칙) */
+export type PetStatus = "active" | "sulky" | "sleep" | "hibernate";
+
+/** public.pets 테이블 한 행 */
+export interface PetRow {
+  id: string;
+  user_id: string;
+  name: string;
+  level: number;
+  battery: number;
+  durability: number;
+  data_used: number;
+  debris: number;
+  exp: number;
+  status: PetStatus;
+  last_settled_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** settle_offline() RPC가 돌려주는 정산 결과 */
+export interface OfflineSettlement {
+  settled: boolean;
+  away_seconds: number;
+  debris_gained?: number;
+  battery_drained?: number;
+  durability_lost?: number;
+  status_after?: PetStatus;
+  pet?: PetRow;
+}
