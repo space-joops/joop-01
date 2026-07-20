@@ -35,15 +35,16 @@ npx supabase stop      # 로컬 스택 종료
 
 ## 기술 스택: 현재 vs 계획
 
-**현재 설치됨:** Next.js 15 (App Router), React 19, TypeScript (strict), Tailwind CSS v4, Framer Motion, Zustand, web-push, @supabase/supabase-js + @supabase/ssr. 경로 별칭 `@/*` → 저장소 루트. Tailwind v4는 `tailwind.config` 파일 없이 `app/globals.css`의 `@theme inline`으로 테마를 정의합니다.
+**현재 설치됨:** Next.js 15 (App Router), React 19, TypeScript (strict), Tailwind CSS v4, Framer Motion, Zustand, web-push, @supabase/supabase-js + @supabase/ssr, three + @react-three/fiber + @react-three/drei. 경로 별칭 `@/*` → 저장소 루트. Tailwind v4는 `tailwind.config` 파일 없이 `app/globals.css`의 `@theme inline`으로 테마를 정의합니다.
 
 **PWA 구현됨** (개발 일지 3편 참조): 매니페스트(`app/manifest.ts`), 서비스 워커(`public/sw.js` — `?v=버전-빌드스탬프` 쿼리로 배포마다 강제 갱신), 설치 넛지, 웹 푸시(VAPID — 환경변수 `NEXT_PUBLIC_VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT` 필요, `scripts/generate-vapid-keys.mjs`로 생성), 동적 파비콘. 서비스 워커는 프로덕션 빌드(`npm run build && npm start`)에서만 등록됩니다. 앱 버전은 `package.json` version을 `next.config.ts`가 빌드 시 구워 넣습니다.
 
 **Supabase 구현됨** (개발 일지 4편, `supabase/README.md` 참조): 익명 인증(쿠키 세션, `@supabase/ssr`), 스키마·RLS·정산 함수는 `supabase/migrations/`가 단일 진실. 환경변수 `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY` — **없으면 게임은 localStorage만 쓰는 로컬 모드로 폴백**합니다. 핵심 설계: 게임 규칙(오프라인 정산 `joop_01_settle_offline()`, 스냅샷 저장 `joop_01_sync_pet()`)은 Postgres 함수(security definer) 안에 있고, `joop_01_pets` 테이블엔 update grant가 없어 직접 수정 치트가 차단됩니다. 모든 DB 객체는 `joop_01_` 접두사를 씁니다(한 Supabase 프로젝트를 여러 실험이 공유하기 위한 네임스페이스). 시간 계산은 전부 DB `now()` 기준. 클라이언트 통합은 `components/pet-link.tsx`(부팅 정산·30초 동기화)와 `app/actions/pet.ts`. 익명 로그인은 클라우드 프로젝트에서 Anonymous sign-ins를 켜야 동작합니다.
 
+**3D 구현됨** (개발 일지 5편 참조): 캐릭터 에셋 팩 v2(`plan/img/*.zip` — 리깅 규약·감정 포즈 레시피·팔레트가 팩 README에 문서화됨)의 GLB 6종이 `public/models/`에 배치됨(진화 1~3단계 + 보조 드론). `components/home/satellite-3d.tsx`가 감정 연출(무드→포즈, 눈=상태등 emissive) 담당 — 힌지 노드는 초기 쿼터니언 × 오프셋 회전으로 합성해야 기본 자세가 보존됩니다. 제스처는 여전히 DOM 레이어(`pet-satellite.tsx`)가 받고 캔버스는 pointer-events 없음. **푸시(배포) 시 `package.json` 버전을 올리세요** — PWA 업데이트 감지 트리거입니다.
+
 **기획상 필요하지만 아직 미설치** — 해당 기능을 구현하는 시점에 추가하세요:
 
-- **React Three Fiber (R3F) + Drei** — 로우폴리 3D 위성/우주 배경 렌더링
 - **Supabase Edge Functions + cron** — 푸시 구독 DB 저장, 펫 상태 기반 알림 자동 발송
 - 배포 대상: **Vercel**
 
