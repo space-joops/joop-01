@@ -33,8 +33,10 @@ const MODEL_URL = "/models/pet_stage1_baby.glb";
  */
 const PET_SHRINK = 0.7;
 /** 동그란 눈알 반지름 — 원본 알약 반폭(0.033)과 비슷한 크기감 */
-const EYE_RADIUS = 0.03;
+const EYE_RADIUS = 0.034;
 const NOSE_SCALE = 0.3;
+/** 코를 눈 쪽으로 끌어올리는 거리 — 원본 'o'는 너무 아래에 있다 */
+const NOSE_LIFT = 0.015;
 /** 스마일 입 폭·선 굵기 (모델 단위 m) */
 const MOUTH_WIDTH = 0.08;
 const MOUTH_THICK = 0.009;
@@ -70,6 +72,15 @@ function applyFaceTweaks(scene: THREE.Group, nodes: Record<string, unknown>) {
   if (!body || !statusLight || !nose) return;
   const noseCenter = centerOf(nose);
   const faceZ = nose.geometry.boundingBox!.max.z;
+
+  // ── 배 패치 숨기기: 정면 구도에선 얼굴 한가운데 거대한 코처럼 보인다
+  //    (스크린샷 피드백의 "뭉퉁한 코"의 정체가 이 belly 메시였다)
+  for (const child of body.children) {
+    const mesh = child as THREE.Mesh;
+    if (mesh.isMesh && (mesh.material as THREE.Material).name === "belly") {
+      mesh.visible = false;
+    }
+  }
 
   // ── 눈 교체: 원본 알약·하이라이트 메시를 숨기고 위치만 물려받는다
   const originals: THREE.Mesh[] = [];
@@ -118,8 +129,10 @@ function applyFaceTweaks(scene: THREE.Group, nodes: Record<string, unknown>) {
     }
   }
 
-  // ── 코: 가운데 점을 30%로 — 뭉툭함을 덜어낸 점코
+  // ── 코: 가운데 점을 30%로 줄이고 눈 쪽으로 끌어올린다 — 아담한 점코
   shrinkAboutPivot(nose, noseCenter, NOSE_SCALE);
+  nose.position.y += NOSE_LIFT;
+  const noseY = noseCenter.y + NOSE_LIFT;
 
   // ── 입: 도톰한 스마일 아크(토러스 일부). 호가 원 아래쪽에 오도록 돌리면 ∪
   const arc = 2.0; // 호의 각도(rad) — 클수록 활짝 웃는 입
@@ -130,8 +143,8 @@ function applyFaceTweaks(scene: THREE.Group, nodes: Record<string, unknown>) {
     nose.material,
   );
   mouth.rotation.z = -Math.PI / 2 - arc / 2; // 호를 원의 맨 아래로
-  // 호의 최하단이 코보다 살짝 아래(-0.02)에 오도록 토러스 중심을 배치
-  mouth.position.set(0, noseCenter.y - 0.02 + radius, faceZ - 0.002);
+  // 스마일 양 끝이 코 높이, 최하단이 코 아래 0.022에 오도록 배치 — 코 바로 밑 미소
+  mouth.position.set(0, noseY - 0.022 + radius, faceZ - 0.002);
   body.add(mouth);
 }
 
