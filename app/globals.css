@@ -85,6 +85,39 @@ body {
   animation: star-twinkle var(--twinkle-duration, 2.4s) ease-in-out infinite;
 }
 
+/* 아기 위성의 안테나 파닥임 — 감정 표현의 핵심 (transform-box: fill-box 로
+   SVG 안테나 자신의 좌표계 기준, 뿌리(왼쪽 아래)를 축으로 회전시킨다) */
+@keyframes antenna-flap {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(-16deg);
+  }
+}
+.animate-antenna-flap {
+  transform-box: fill-box;
+  transform-origin: 0% 100%;
+  animation: antenna-flap 1.4s ease-in-out infinite;
+}
+
+/* 추진기 불꽃 일렁임 — 노즐(위쪽)을 고정하고 아래로 늘었다 줄었다 */
+@keyframes flame-flicker {
+  0%,
+  100% {
+    transform: scaleY(1);
+  }
+  50% {
+    transform: scaleY(1.45);
+  }
+}
+.animate-flame-flicker {
+  transform-box: fill-box;
+  transform-origin: 50% 0%;
+  animation: flame-flicker 0.16s ease-in-out infinite;
+}
+
 /* 터치 피드백 이모지 파티클 — 위로 떠오르며 사라진다 */
 @keyframes particle-rise {
   0% {
