@@ -31,14 +31,14 @@ npm run lint     # ESLint (flat config, eslint-config-next)
 
 ## 기술 스택: 현재 vs 계획
 
-**현재 설치됨:** Next.js 15 (App Router), React 19, TypeScript (strict), Tailwind CSS v4. 경로 별칭 `@/*` → 저장소 루트. Tailwind v4는 `tailwind.config` 파일 없이 `app/globals.css`의 `@theme inline`으로 테마를 정의합니다.
+**현재 설치됨:** Next.js 15 (App Router), React 19, TypeScript (strict), Tailwind CSS v4, Framer Motion, Zustand, web-push. 경로 별칭 `@/*` → 저장소 루트. Tailwind v4는 `tailwind.config` 파일 없이 `app/globals.css`의 `@theme inline`으로 테마를 정의합니다.
+
+**PWA 구현됨** (개발 일지 3편 참조): 매니페스트(`app/manifest.ts`), 서비스 워커(`public/sw.js` — `?v=버전-빌드스탬프` 쿼리로 배포마다 강제 갱신), 설치 넛지, 웹 푸시(VAPID — 환경변수 `NEXT_PUBLIC_VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT` 필요, `scripts/generate-vapid-keys.mjs`로 생성), 동적 파비콘. 서비스 워커는 프로덕션 빌드(`npm run build && npm start`)에서만 등록됩니다. 앱 버전은 `package.json` version을 `next.config.ts`가 빌드 시 구워 넣습니다.
 
 **기획상 필요하지만 아직 미설치** — 해당 기능을 구현하는 시점에 추가하세요:
 
-- **Framer Motion** — UI 애니메이션
 - **React Three Fiber (R3F) + Drei** — 로우폴리 3D 위성/우주 배경 렌더링
-- **Zustand** — 방치형 게임 클라이언트 상태 및 로컬 자원 관리
-- **Supabase** — PostgreSQL, Auth, Edge Functions (BaaS)
+- **Supabase** — PostgreSQL, Auth, Edge Functions (BaaS). 푸시 구독 저장·펫 상태 기반 발송 cron도 여기로 옮길 예정
 - 배포 대상: **Vercel**
 
 ## 핵심 게임 시스템 (기획 요약)
