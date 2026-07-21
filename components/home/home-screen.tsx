@@ -113,7 +113,8 @@ export default function HomeScreen() {
     return () => clearInterval(timer);
   }, []);
 
-  // 개발 중 연출 확인용: ?mood=hibernate|sulky, ?action=1 (프로덕션에선 무시)
+  // 개발 중 연출 확인용: ?mood=hibernate|sulky, ?action=1,
+  // ?level=2|3&variant=net|magnet|laser (프로덕션에선 무시)
   useEffect(() => {
     if (process.env.NODE_ENV === "production") return;
     const params = new URLSearchParams(window.location.search);
@@ -122,6 +123,15 @@ export default function HomeScreen() {
       usePetStore.setState({ mood: forced, moodProgress: 0 });
     }
     if (params.has("action")) setSortieBanner(true);
+    // 출격 스프라이트·장비 패시브 확인용 강제 진화
+    const level = params.get("level");
+    if (level === "2" || level === "3") {
+      usePetStore.setState({ level: Number(level) });
+    }
+    const variant = params.get("variant");
+    if (variant === "net" || variant === "magnet" || variant === "laser") {
+      usePetStore.setState({ level: 3, variant });
+    }
   }, []);
 
   // 펫의 지금 기분/상황을 한 줄로 알려주는 상태 메시지.
