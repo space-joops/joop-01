@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 128" width="256" height="128" fill="none">
+  <!-- 플라이바이: 국제우주정거장(ISS) — 수평 트러스 + 4쌍 태양전지 어레이 + 모듈 군 -->
+  <defs>
+    <linearGradient id="iss-array" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#D9A254"/>
+      <stop offset="0.5" stop-color="#B97F35"/>
+      <stop offset="1" stop-color="#8F5E22"/>
+    </linearGradient>
+    <linearGradient id="iss-module" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F4F6FA"/>
+      <stop offset="0.6" stop-color="#D7DCE4"/>
+      <stop offset="1" stop-color="#AEB6C2"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 태양전지 어레이 4쌍 (트러스 위·아래로 수직 장착) -->
+  <g>
+    <!-- 좌측 바깥 -->
+    <rect x="22" y="10" width="24" height="46" rx="1.5" fill="url(#iss-array)"/>
+    <rect x="22" y="72" width="24" height="46" rx="1.5" fill="url(#iss-array)"/>
+    <!-- 좌측 안쪽 -->
+    <rect x="58" y="10" width="24" height="46" rx="1.5" fill="url(#iss-array)"/>
+    <rect x="58" y="72" width="24" height="46" rx="1.5" fill="url(#iss-array)"/>
+    <!-- 우측 안쪽 -->
+    <rect x="174" y="10" width="24" height="46" rx="1.5" fill="url(#iss-array)"/>
+    <rect x="174" y="72" width="24" height="46" rx="1.5" fill="url(#iss-array)"/>
+    <!-- 우측 바깥 -->
+    <rect x="210" y="10" width="24" height="46" rx="1.5" fill="url(#iss-array)"/>
+    <rect x="210" y="72" width="24" height="46" rx="1.5" fill="url(#iss-array)"/>
+    <!-- 어레이 셀 스트라이프 -->
+    <g stroke="#6E4715" stroke-width="0.9" opacity="0.75">
+      <path d="M34 10v46M34 72v46M70 10v46M70 72v46M186 10v46M186 72v46M222 10v46M222 72v46"/>
+    </g>
+    <g stroke="#E9BC77" stroke-width="0.7" opacity="0.8">
+      <path d="M22 21h24M22 33h24M22 45h24M22 83h24M22 95h24M22 107h24"/>
+      <path d="M58 21h24M58 33h24M58 45h24M58 83h24M58 95h24M58 107h24"/>
+      <path d="M174 21h24M174 33h24M174 45h24M174 83h24M174 95h24M174 107h24"/>
+      <path d="M210 21h24M210 33h24M210 45h24M210 83h24M210 95h24M210 107h24"/>
+    </g>
+  </g>
+
+  <!-- 메인 트러스 (수평 백본) -->
+  <rect x="14" y="59" width="228" height="10" rx="2" fill="#8E98A8"/>
+  <g stroke="#5F6876" stroke-width="1">
+    <path d="M26 59v10M40 59v10M54 59v10M68 59v10M82 59v10M96 59v10M160 59v10M188 59v10M202 59v10M216 59v10M230 59v10"/>
+  </g>
+  <path d="M14 61h228" stroke="#C3CAD5" stroke-width="1" opacity="0.7"/>
+
+  <!-- 방열판 (흰색 라디에이터) -->
+  <g>
+    <rect x="96" y="20" width="9" height="34" rx="1" fill="#E8ECF2"/>
+    <rect x="151" y="74" width="9" height="34" rx="1" fill="#E8ECF2"/>
+    <path d="M100.5 20v34M155.5 74v34" stroke="#B4BCC8" stroke-width="0.8"/>
+    <path d="M96 31h9M96 42h9M151 85h9M151 96h9" stroke="#B4BCC8" stroke-width="0.8"/>
+  </g>
+
+  <!-- 가압 모듈 군 (수직 축) -->
+  <g>
+    <!-- 세로 모듈 줄기 -->
+    <rect x="119" y="30" width="18" height="68" rx="8" fill="url(#iss-module)"/>
+    <path d="M119 44h18M119 58h18M119 84h18" stroke="#98A2B0" stroke-width="1"/>
+    <!-- 가로 모듈 (Node) -->
+    <rect x="103" y="53" width="50" height="22" rx="10" fill="url(#iss-module)"/>
+    <path d="M113 53v22M128 53v22M143 53v22" stroke="#98A2B0" stroke-width="1"/>
+    <!-- 도킹 포트 · 큐폴라 -->
+    <circle cx="128" cy="103" r="5.5" fill="#C7CEDB"/>
+    <circle cx="128" cy="103" r="2.6" fill="#3C4451"/>
+    <rect x="123" y="24" width="10" height="7" rx="3" fill="#C7CEDB"/>
+  </g>
+
+  <!-- 소형 어레이(러시아 구역) -->
+  <rect x="88" y="76" width="26" height="8" rx="1" fill="url(#iss-array)" transform="rotate(24 101 80)"/>
+  <rect x="142" y="42" width="26" height="8" rx="1" fill="url(#iss-array)" transform="rotate(24 155 46)"/>
+</svg>

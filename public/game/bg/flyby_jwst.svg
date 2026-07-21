@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 128" width="192" height="128" fill="none">
+  <!-- 플라이바이: 제임스 웹 우주망원경 — 금빛 육각 분할 거울 + 연보라 연꼴 차양막 -->
+  <defs>
+    <linearGradient id="jw-shield1" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#E5DDF2"/>
+      <stop offset="1" stop-color="#B7A8D6"/>
+    </linearGradient>
+    <linearGradient id="jw-shield2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#CBBFE2"/>
+      <stop offset="1" stop-color="#9D8CC2"/>
+    </linearGradient>
+    <linearGradient id="jw-gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#F2D678"/>
+      <stop offset="1" stop-color="#C0951F"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 차양막(선실드) — 5겹 연꼴, 3겹으로 단순화 -->
+  <path d="M8 92 L96 66 L184 92 L96 120 Z" fill="url(#jw-shield2)"/>
+  <path d="M16 91 L96 68 L176 91 L96 114 Z" fill="url(#jw-shield1)"/>
+  <path d="M26 90 L96 71 L166 90 L96 108 Z" fill="#EFE9F8"/>
+  <g stroke="#8F7DB5" stroke-width="0.8" opacity="0.7">
+    <path d="M16 91 L96 68 L176 91 L96 114 Z" fill="none"/>
+    <path d="M26 90 L96 71 L166 90 L96 108 Z" fill="none"/>
+  </g>
+
+  <!-- 거울 지지 타워 -->
+  <rect x="92" y="52" width="8" height="18" fill="#6E7684"/>
+
+  <!-- 주경 — 금빛 육각 세그먼트 (중앙 1 + 둘레 6 + 좌우 확장) -->
+  <g stroke="#8A6D1B" stroke-width="1">
+    <path d="M88 34 L92 27 L100 27 L104 34 L100 41 L92 41 Z" fill="url(#jw-gold)"/>
+    <path d="M74 34 L78 27 L86 27 L90 34 L86 41 L78 41 Z" fill="url(#jw-gold)"/>
+    <path d="M102 34 L106 27 L114 27 L118 34 L114 41 L106 41 Z" fill="url(#jw-gold)"/>
+    <path d="M81 22 L85 15 L93 15 L97 22 L93 29 L85 29 Z" fill="url(#jw-gold)"/>
+    <path d="M95 22 L99 15 L107 15 L111 22 L107 29 L99 29 Z" fill="url(#jw-gold)"/>
+    <path d="M81 46 L85 39 L93 39 L97 46 L93 53 L85 53 Z" fill="url(#jw-gold)"/>
+    <path d="M95 46 L99 39 L107 39 L111 46 L107 53 L99 53 Z" fill="url(#jw-gold)"/>
+    <path d="M67 22 L71 15 L79 15 L83 22 L79 29 L71 29 Z" fill="url(#jw-gold)" opacity="0.95"/>
+    <path d="M109 22 L113 15 L121 15 L125 22 L121 29 L117 29 Z" fill="url(#jw-gold)" opacity="0.95"/>
+  </g>
+  <!-- 거울 반짝임 -->
+  <path d="M84 18l4 3M98 32l4 3" stroke="#FFF3C4" stroke-width="1.2" opacity="0.9"/>
+
+  <!-- 부경 스트럿 (삼각대) -->
+  <g stroke="#3C4451" stroke-width="1.6" stroke-linecap="round">
+    <line x1="78" y1="20" x2="96" y2="4"/>
+    <line x1="114" y1="20" x2="96" y2="4"/>
+    <line x1="96" y1="30" x2="96" y2="6"/>
+  </g>
+  <circle cx="96" cy="4" r="3" fill="#2A313F"/>
+
+  <!-- 하단 버스·안테나 -->
+  <rect x="88" y="116" width="16" height="8" rx="2" fill="#8E98A8"/>
+  <line x1="104" y1="118" x2="114" y2="126" stroke="#8892A0" stroke-width="1.2"/>
+</svg>
