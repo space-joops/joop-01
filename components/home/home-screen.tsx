@@ -16,6 +16,7 @@ import StatusGauges from "@/components/home/status-gauges";
 import PetSatellite from "@/components/home/pet-satellite";
 import ConsoleSettings from "@/components/home/console-settings";
 import EvolveSheet, { VARIANT_INFO } from "@/components/home/evolve-sheet";
+import ActionMode from "@/components/action/action-mode";
 
 /**
  * 홈 화면 (관제 콘솔) — 헤더 · 게이지 · 펫 · 액션 버튼을 조립한다.
@@ -74,6 +75,32 @@ export default function HomeScreen() {
   // 다음 레벨까지의 경험치 목표 (만렙이면 없음)
   const nextExp = level === 1 ? EVOLVE_EXP[2] : level === 2 ? EVOLVE_EXP[3] : null;
 
+  // 출격(액션 모드): 돌발 이벤트 배너 — 레이더가 가끔 파편 군집을 포착한다
+  const [sortieOpen, setSortieOpen] = useState(false);
+  const [sortieBanner, setSortieBanner] = useState(false);
+  const sortieStateRef = useRef({ open: false, banner: false });
+  sortieStateRef.current = { open: sortieOpen, banner: sortieBanner };
+  useEffect(() => {
+    const roll = setInterval(() => {
+      const s = usePetStore.getState();
+      const { open, banner } = sortieStateRef.current;
+      const awake = s.mood !== "hibernate" && s.battery > 0;
+      // 15초마다 22% 확률 — 평균 1~2분에 한 번 레이더가 울린다
+      if (!open && !banner && awake && s.battery >= 20 && Math.random() < 0.22) {
+        setSortieBanner(true);
+        setTimeout(() => setSortieBanner(false), 20_000); // 20초 내 미응답 시 소멸
+      }
+    }, 15_000);
+    return () => clearInterval(roll);
+  }, []);
+
+  const enterSortie = () => {
+    // 배터리 차감 포함 — 조건 미달이면 스토어가 거절한다
+    if (!usePetStore.getState().startSortie()) return;
+    setSortieBanner(false);
+    setSortieOpen(true);
+  };
+
   // 궤도 순항 중 배터리 자연 소모.
   // getState()로 호출하면 interval을 다시 걸지 않고도 항상 최신 상태를 쓴다.
   useEffect(() => {
@@ -83,13 +110,15 @@ export default function HomeScreen() {
     return () => clearInterval(timer);
   }, []);
 
-  // 개발 중 무드 연출 확인용: ?mood=hibernate | sulky (프로덕션에선 무시)
+  // 개발 중 연출 확인용: ?mood=hibernate|sulky, ?action=1 (프로덕션에선 무시)
   useEffect(() => {
     if (process.env.NODE_ENV === "production") return;
-    const forced = new URLSearchParams(window.location.search).get("mood");
+    const params = new URLSearchParams(window.location.search);
+    const forced = params.get("mood");
     if (forced === "hibernate" || forced === "sulky") {
       usePetStore.setState({ mood: forced, moodProgress: 0 });
     }
+    if (params.has("action")) setSortieBanner(true);
   }, []);
 
   // 펫의 지금 기분/상황을 한 줄로 알려주는 상태 메시지.
@@ -170,6 +199,23 @@ export default function HomeScreen() {
       {/* 상태 메시지 */}
       <p className="text-center text-xs text-foreground/70">{statusMessage}</p>
 
+      {/* 돌발 이벤트 — 레이더가 파편 군집을 포착하면 출격 기회! */}
+      <AnimatePresence>
+        {sortieBanner && !hibernating && !sleeping && (
+          <motion.button
+            key="sortie-banner"
+            type="button"
+            onClick={enterSortie}
+            className="rounded-2xl border border-sky-300/60 bg-sky-400/15 py-3 text-sm font-bold transition active:scale-95"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+          >
+            📡 파편 군집 포착! 출격하기 (🔋 -10)
+          </motion.button>
+        )}
+      </AnimatePresence>
+
       {/* 진화 준비 완료 — 임계값에 닿으면 나타나는 승급 버튼 */}
       {target && !hibernating && (
         <button
@@ -209,6 +255,13 @@ export default function HomeScreen() {
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
       />
+
+      {/* 출격 — 수동 관제 모드 전체 화면 */}
+      <AnimatePresence>
+        {sortieOpen && (
+          <ActionMode key="sortie" onClose={() => setSortieOpen(false)} />
+        )}
+      </AnimatePresence>
 
       {/* 진화 시트 + 레벨업 플래시 */}
       <AnimatePresence>
