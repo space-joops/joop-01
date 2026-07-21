@@ -123,8 +123,24 @@ export default function SortieField({ config, onEnd }: SortieFieldProps) {
     const DIFF = DIFFICULTY;
     /** 충돌용 펫 반지름 — 스티커의 몸통만 잡는 느낌으로 표시 크기보다 작게 */
     const petR = Math.round(petImgSize * 0.36);
-    const accelMul = 1;
-    const magnetRange = TUNE.magnetRange;
+
+    /*
+     * 본편 육성이 조종감에 스며든다 (jd-03의 스탯 연동 계승):
+     * - AI 코어 업그레이드 → 추진 가속 보너스 (레벨당 +6%)
+     * - 3단계 장비 분기 → 장비다운 패시브 하나씩
+     *     자석: 끌어당김 범위 +60% (자기장이 은은하게 보인다)
+     *     그물: 획득 판정 +8px, 대형 파편은 그물 투척 연출
+     *     레이저: 피격 에너지 손실 절반 + 무적 시간 +50%, 반격 빔 연출
+     */
+    const isEquip = (v: PetVariant) =>
+      config.level >= 3 && config.variant === v;
+    const accelMul = 1 + 0.06 * config.aiCoreLevel;
+    const magnetRange = TUNE.magnetRange * (isEquip("magnet") ? 1.6 : 1);
+    const eatBonus = TUNE.eatBonus + (isEquip("net") ? 8 : 0);
+    const hazardDamage = isEquip("laser")
+      ? Math.round(DIFF.hazardDamage / 2)
+      : DIFF.hazardDamage;
+    const invincibleTime = TUNE.invincible * (isEquip("laser") ? 1.5 : 1);
 
     // ---- 화면 맞춤: 실제 px 좌표계 (resize 대응) ----
     let w = field.clientWidth;
@@ -306,6 +322,10 @@ export default function SortieField({ config, onEnd }: SortieFieldProps) {
       debrisValue += j.stat.debris;
       expGain += j.stat.exp;
       eaten += 1;
+      // 그물 장비: 대형 파편은 그물을 촥 펼쳐 잡는다
+      if (j.kind === "fuel_tank" && isEquip("net")) {
+        burstFx(FX_SRC.netThrow, j.x, j.y, 96);
+      }
       burstFx(FX_SRC.collectRing, j.x, j.y);
       popup(
         Math.random() < 0.5
@@ -333,13 +353,29 @@ export default function SortieField({ config, onEnd }: SortieFieldProps) {
 
     const hit = (j: Junk) => {
       hits += 1;
-      invincible = TUNE.invincible;
-      energy = Math.max(0, energy - DIFF.hazardDamage);
+      invincible = invincibleTime;
+      energy = Math.max(0, energy - hazardDamage);
+      // 레이저 장비: 얻어맞고만 있지 않는다 — 반격 빔 연출
+      if (isEquip("laser")) burstFx(FX_SRC.laserBeam, j.x, j.y, 80);
       burstFx(FX_SRC.alert, pet.x, pet.y - petR - 20, 48);
-      popup(`아야! 에너지 -${DIFF.hazardDamage}`, pet.x, pet.y - petR - 16, "#ff6b6b");
+      popup(`아야! 에너지 -${hazardDamage}`, pet.x, pet.y - petR - 16, "#ff6b6b");
       shakeScreen();
       removeJunk(junks.indexOf(j));
     };
+
+    // 자석 장비: 자기장 링이 펫을 따라다닌다 — 패시브가 눈에 보이게
+    const magnetSize = (petR + magnetRange) * 2;
+    let magnetEl: HTMLImageElement | null = null;
+    if (isEquip("magnet")) {
+      magnetEl = document.createElement("img");
+      magnetEl.src = FX_SRC.magnetField;
+      magnetEl.alt = "";
+      magnetEl.className = "pointer-events-none absolute left-0 top-0 opacity-30";
+      magnetEl.style.width = `${magnetSize}px`;
+      magnetEl.style.height = `${magnetSize}px`;
+      magnetEl.style.willChange = "transform";
+      layer.insertBefore(magnetEl, petEl); // 펫 뒤에 은은하게 깔린다
+    }
 
     // ---- update: 상태만 바꾼다 (표시는 아래 sync가 담당) ----
     const update = (dt: number) => {
@@ -448,7 +484,7 @@ export default function SortieField({ config, onEnd }: SortieFieldProps) {
             hit(j);
             continue;
           }
-        } else if (dist < petR + j.stat.radius + TUNE.eatBonus) {
+        } else if (dist < petR + j.stat.radius + eatBonus) {
           // 획득 판정은 후하게 — 아깝게 놓치는 억울함이 없게
           if (j.kind === "solar_fragment") pickupCell(j);
           else eat(j);
@@ -468,6 +504,11 @@ export default function SortieField({ config, onEnd }: SortieFieldProps) {
         pet.y - petImgSize / 2
       }px, 0) rotate(${tilt}deg)`;
       petEl.style.opacity = blinking ? "0.25" : "1";
+      if (magnetEl) {
+        magnetEl.style.transform = `translate3d(${pet.x - magnetSize / 2}px, ${
+          pet.y - magnetSize / 2
+        }px, 0) rotate(${elapsed * 30}deg)`;
+      }
 
       // 추진 화염 — 분사 반대편에서 단계 색으로 타오른다
       if (thrusting) {
