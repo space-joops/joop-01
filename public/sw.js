@@ -167,6 +167,40 @@ self.addEventListener("push", (event) => {
   );
 });
 
+/* ── 구독 자동 갱신 ─────────────────────────────
+ * 브라우저 푸시 서버는 가끔 구독(endpoint)을 일방적으로 갈아끼운다.
+ * 그대로 두면 DB에 남은 옛 주소로만 발송해 알림이 조용히 끊긴다.
+ * 이 이벤트에서 새 구독을 만들어 서버 주소록에 다시 등록한다.
+ * (지원이 브라우저마다 불균일한 이벤트라 최선 노력일 뿐이고,
+ *  실패해도 다음 앱 방문 때 자가 치유 저장이 복구한다.)
+ */
+self.addEventListener("pushsubscriptionchange", (event) => {
+  event.waitUntil(
+    (async () => {
+      try {
+        const applicationServerKey =
+          event.oldSubscription?.options?.applicationServerKey;
+        if (!applicationServerKey) return; // 키를 모르면 재구독 불가 — 포기
+
+        const subscription =
+          event.newSubscription ??
+          (await self.registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey,
+          }));
+
+        await fetch("/api/push/subscription", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(subscription.toJSON()),
+        });
+      } catch {
+        // 조용히 포기 — 자가 치유 루프가 다음 방문 때 해결한다
+      }
+    })(),
+  );
+});
+
 /* ── 알림 클릭: 이미 열린 탭이 있으면 포커스, 없으면 새로 연다 ── */
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();

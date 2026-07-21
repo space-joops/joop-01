@@ -10,7 +10,11 @@ import {
   subscribeToPush,
   unsubscribeFromPush,
 } from "@/lib/push-client";
-import { sendPushToSelf } from "@/app/actions/push";
+import {
+  removePushSubscription,
+  savePushSubscription,
+  sendPushToSelf,
+} from "@/app/actions/push";
 import { PUSH_MESSAGES, type PushMessageKey } from "@/lib/push-messages";
 import { usePwaStore } from "@/stores/pwa-store";
 
@@ -67,7 +71,14 @@ export default function ConsoleSettings({
       if (!hasVapidKey()) return "no-key";
       if (Notification.permission === "denied") return "denied";
       const subscription = await registration.pushManager.getSubscription();
-      return subscription ? "on" : "off";
+      if (subscription) {
+        // 드리프트 자가 치유: 브라우저엔 구독이 있는데 DB엔 없는 상태
+        // (익명 계정 교체, DB 초기화 등)를 방문 때마다 조용히 복구한다.
+        // 결과는 기다리지 않는다 — UI 상태 표시와는 무관하므로.
+        void savePushSubscription(subscription.toJSON());
+        return "on";
+      }
+      return "off";
     })().then((status) => {
       if (!cancelled) setPushStatus(status as PushStatus);
     });
@@ -84,7 +95,15 @@ export default function ConsoleSettings({
       const subscription = await subscribeToPush();
       if (subscription) {
         setPushStatus("on");
-        setNotice("📡 관제 회선이 연결됐어요. 줍이의 소식을 전해 드릴게요!");
+        // 구독을 서버 주소록에도 등록 — 이제부터 크론이 먼저 말을 건다
+        const saved = await savePushSubscription(subscription.toJSON());
+        if (saved.ok) {
+          setNotice("📡 관제 회선이 연결됐어요. 줍이의 위급 상황을 자동으로 알려드려요!");
+        } else if (saved.reason === "not-configured") {
+          setNotice("📡 알림은 켜졌어요. 관제 서버가 없어 지금은 테스트 전파만 가능해요.");
+        } else {
+          setNotice("📡 알림은 켜졌어요. 서버 등록은 다음 접속 때 자동으로 다시 시도해요.");
+        }
       } else {
         setPushStatus(
           Notification.permission === "denied" ? "denied" : "off",
@@ -99,7 +118,9 @@ export default function ConsoleSettings({
   const disablePush = async () => {
     setBusy(true);
     try {
-      await unsubscribeFromPush();
+      // 해지 "전"의 endpoint를 받아 서버 주소록에서도 지운다
+      const endpoint = await unsubscribeFromPush();
+      if (endpoint) void removePushSubscription(endpoint);
       setPushStatus("off");
       setNotice(null);
     } finally {

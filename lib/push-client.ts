@@ -70,8 +70,16 @@ export async function subscribeToPush(): Promise<PushSubscription | null> {
   });
 }
 
-/** 구독 해지 */
-export async function unsubscribeFromPush(): Promise<void> {
+/**
+ * 구독 해지.
+ * 해지한 구독의 endpoint를 돌려준다 — 서버 DB에서도 같은 주소를
+ * 지워야 하는데, unsubscribe() 후에는 endpoint를 읽을 수 없어서
+ * 지우기 "전에" 확보해 반환한다.
+ */
+export async function unsubscribeFromPush(): Promise<string | null> {
   const subscription = await getPushSubscription();
-  await subscription?.unsubscribe();
+  if (!subscription) return null;
+  const endpoint = subscription.endpoint;
+  await subscription.unsubscribe();
+  return endpoint;
 }
