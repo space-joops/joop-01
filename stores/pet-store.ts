@@ -52,6 +52,11 @@ export const evolveTarget = (level: number, exp: number): 2 | 3 | null => {
   return null;
 };
 
+/** 출격(액션 모드) 배터리 비용 — 추진체 분사는 공짜가 아니다 */
+export const SORTIE_BATTERY_COST = 10;
+/** 이 밑으로는 출격 불가 — 돌아올 연료는 남겨둬야 한다 */
+export const SORTIE_MIN_BATTERY = 20;
+
 /** 값을 [min, max] 범위로 잘라내는 유틸 (파이썬의 max(min(v, hi), lo)) */
 const clamp = (value: number, min = 0, max = GAUGE_MAX) =>
   Math.min(max, Math.max(min, value));
@@ -91,6 +96,14 @@ interface PetState {
    * 서버 연동 시엔 evolvePet 액션 결과를 hydrateFromServer로 반영한다.
    */
   evolveLocal: (variant: PetVariant | null) => void;
+  /** 출격 — 배터리를 소모하고 액션 모드로. 조건 미달이면 false */
+  startSortie: () => boolean;
+  /** 귀환 — 라운드 결과(보상·피해)를 한 번에 반영한다 */
+  finishSortie: (result: {
+    debris: number;
+    exp: number;
+    durabilityLoss: number;
+  }) => void;
   /**
    * 서버 정산 결과로 상태 덮어쓰기 — DB 컬럼명(snake_case)을 여기서 번역한다.
    * keepMood: 정산이 없었던 부팅에서는 서버 status가 낡은 값이므로
@@ -101,7 +114,7 @@ interface PetState {
 
 export const usePetStore = create<PetState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       // 첫 화면에서 게이지 변화를 바로 체험할 수 있도록 일부러 꽉 채우지 않은 초기값
       battery: 80,
       durability: 65,
@@ -167,6 +180,28 @@ export const usePetStore = create<PetState>()(
 
       tickIdle: () =>
         set((state) => ({ battery: clamp(state.battery - 1) })),
+
+      startSortie: () => {
+        const state = get();
+        // 동면 중이거나 연료가 빠듯하면 출격 불가
+        if (state.mood === "hibernate") return false;
+        if (state.battery < SORTIE_MIN_BATTERY) return false;
+        set({ battery: clamp(state.battery - SORTIE_BATTERY_COST) });
+        return true;
+      },
+
+      finishSortie: ({ debris, exp, durabilityLoss }) =>
+        set((state) => ({
+          debris: state.debris + debris,
+          exp: state.exp + exp,
+          // 수집하면 데이터도 쌓인다 — 오프라인 정산과 같은 비율(파편 1 = 데이터 1)
+          dataUsed: clamp(state.dataUsed + debris),
+          // 충돌 데미지 하한선: 이미 하한 밑이면 현재값 유지 (기획서 원칙)
+          durability: Math.max(
+            Math.min(DURABILITY_FLOOR, state.durability),
+            state.durability - durabilityLoss,
+          ),
+        })),
 
       evolveLocal: (variant) =>
         set((state) => {
