@@ -579,6 +579,9 @@ export default function SortieField({ config, onEnd }: SortieFieldProps) {
       y: e.clientY - originY,
     });
     const onDown = (e: PointerEvent) => {
+      // HUD 버튼([귀환]) 위에서는 스틱을 만들지 않는다 — setPointerCapture가
+      // 클릭 이벤트까지 가로채서 버튼이 안 눌리는 사고 방지
+      if (e.target instanceof Element && e.target.closest("button")) return;
       const p = toLocal(e);
       joyOx = p.x;
       joyOy = p.y;
