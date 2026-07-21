@@ -1,7 +1,12 @@
 "use server";
 
 import { getSupabaseServerClient } from "@/lib/supabase/server";
-import type { OfflineSettlement, PetRow } from "@/lib/supabase/types";
+import type {
+  EvolveResult,
+  OfflineSettlement,
+  PetRow,
+  PetVariant,
+} from "@/lib/supabase/types";
 
 /**
  * 펫 Server Actions — 관제 링크의 서버 쪽 절반.
@@ -80,6 +85,31 @@ export interface PetSnapshot {
   dataUsed: number;
   debris: number;
   exp: number;
+}
+
+export type EvolvePetResult =
+  | (EvolveResult & { configured: true })
+  | { configured: false };
+
+/**
+ * 진화 요청 — 임계값 검증은 전부 DB 함수 안에서 이루어진다.
+ * Supabase 미설정(로컬 모드)이면 configured:false를 돌려주고,
+ * 클라이언트가 스토어의 로컬 진화 로직으로 폴백한다.
+ */
+export async function evolvePet(
+  variant: PetVariant | null,
+): Promise<EvolvePetResult> {
+  const supabase = await getSupabaseServerClient();
+  if (!supabase) return { configured: false };
+
+  const { data, error } = await supabase.rpc("joop_01_evolve_pet", {
+    p_variant: variant,
+  });
+  if (error) {
+    console.error("[pet] 진화 실패:", error.message);
+    return { configured: true, ok: false };
+  }
+  return { configured: true, ...(data as EvolveResult) };
 }
 
 /** 플레이 중 주기 동기화 — last_settled_at도 now()로 당겨 이중 정산을 막는다 */

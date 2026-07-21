@@ -21,9 +21,11 @@ npx supabase stop      # 종료
 
 1. [supabase.com](https://supabase.com)에서 프로젝트 생성 (무료 티어 충분)
 2. **Authentication → Sign In / Providers → Anonymous sign-ins 켜기** (잊기 쉬움!)
-3. 마이그레이션 적용 — 둘 중 하나:
-   - 대시보드 SQL Editor에 `migrations/20260721000000_joops_init.sql` 붙여넣고 실행
-   - 또는 CLI: `npx supabase login` 후 `npx supabase link --project-ref <ref>` → `npx supabase db push`
+3. 마이그레이션 적용 — **한 가지 경로만 쓸 것 (혼용 금지)**:
+   - 권장: `npx supabase login` → `npx supabase link --project-ref <ref>` → `npx supabase db push`
+     (CLI가 적용 이력을 기록해 이미 적용된 파일을 재실행하지 않는다)
+   - 대시보드 SQL Editor 수동 실행은 이력이 남지 않아, 나중에 db push가
+     같은 파일을 재실행할 수 있다 — 2026-07-21에 실제로 데이터 초기화 사고가 났다
 4. Vercel 환경변수에 프로젝트 URL과 키 등록 (`.env.example` 참조).
    키는 신형(`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `sb_publishable_…`)과
    구형(`NEXT_PUBLIC_SUPABASE_ANON_KEY`, JWT) 어느 쪽이든 인식한다.

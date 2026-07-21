@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   usePetStore,
   isSleeping,
   isDataFull,
+  evolveTarget,
+  EVOLVE_EXP,
   HIBERNATE_WAKE_STROKES,
   SULKY_CHEER_STROKES,
 } from "@/stores/pet-store";
@@ -12,6 +15,7 @@ import { APP_VERSION } from "@/lib/pwa";
 import StatusGauges from "@/components/home/status-gauges";
 import PetSatellite from "@/components/home/pet-satellite";
 import ConsoleSettings from "@/components/home/console-settings";
+import EvolveSheet, { VARIANT_INFO } from "@/components/home/evolve-sheet";
 
 /**
  * 홈 화면 (관제 콘솔) — 헤더 · 게이지 · 펫 · 액션 버튼을 조립한다.
@@ -37,6 +41,8 @@ export default function HomeScreen() {
   const dataUsed = usePetStore((state) => state.dataUsed);
   const debris = usePetStore((state) => state.debris);
   const exp = usePetStore((state) => state.exp);
+  const level = usePetStore((state) => state.level);
+  const variant = usePetStore((state) => state.variant);
   const mood = usePetStore((state) => state.mood);
   const moodProgress = usePetStore((state) => state.moodProgress);
   const chargeSolar = usePetStore((state) => state.chargeSolar);
@@ -48,6 +54,25 @@ export default function HomeScreen() {
 
   // 관제 설정 시트 (알림 · 설치 · 버전 정보)
   const [settingsOpen, setSettingsOpen] = useState(false);
+
+  // 진화: 다음 목표 레벨(임계값 도달 시), 시트 열림, 레벨업 플래시
+  const target = evolveTarget(level, exp);
+  const [evolveOpen, setEvolveOpen] = useState(false);
+  const [levelUpFlash, setLevelUpFlash] = useState(false);
+  const prevLevelRef = useRef(level);
+  useEffect(() => {
+    // 레벨이 "올라간" 순간에만 축하 플래시 (하이드레이션 첫 세팅은 제외)
+    if (level > prevLevelRef.current) {
+      setLevelUpFlash(true);
+      const timer = setTimeout(() => setLevelUpFlash(false), 1800);
+      prevLevelRef.current = level;
+      return () => clearTimeout(timer);
+    }
+    prevLevelRef.current = level;
+  }, [level]);
+
+  // 다음 레벨까지의 경험치 목표 (만렙이면 없음)
+  const nextExp = level === 1 ? EVOLVE_EXP[2] : level === 2 ? EVOLVE_EXP[3] : null;
 
   // 궤도 순항 중 배터리 자연 소모.
   // getState()로 호출하면 interval을 다시 걸지 않고도 항상 최신 상태를 쓴다.
@@ -82,7 +107,7 @@ export default function HomeScreen() {
             : "궤도를 순항하며 파편을 줍는 중 ✨";
 
   return (
-    <main className="flex h-full flex-col gap-3 p-4 pt-[max(1rem,env(safe-area-inset-top))]">
+    <main className="relative flex h-full flex-col gap-3 p-4 pt-[max(1rem,env(safe-area-inset-top))]">
       {/* 헤더: 운영사 + 보유 자원 + 설정 */}
       <header className="flex items-center justify-between">
         <div>
@@ -93,14 +118,22 @@ export default function HomeScreen() {
               v{APP_VERSION}
             </span>
           </p>
-          <h1 className="text-lg font-bold">줍이 · LV.1</h1>
+          <h1 className="text-lg font-bold">
+            줍이 · LV.{level}
+            {variant && (
+              <span className="ml-1">{VARIANT_INFO[variant].emoji}</span>
+            )}
+          </h1>
         </div>
         <div className="flex items-center gap-3">
           <div className="text-right text-sm">
             <p>
               ☄️ 파편 <span className="font-bold">{Math.floor(debris)}</span>
             </p>
-            <p className="text-[11px] text-foreground/50">EXP {exp}</p>
+            <p className="text-[11px] text-foreground/50">
+              EXP {exp}
+              {nextExp !== null && ` / ${nextExp}`}
+            </p>
           </div>
           <button
             type="button"
@@ -137,6 +170,17 @@ export default function HomeScreen() {
       {/* 상태 메시지 */}
       <p className="text-center text-xs text-foreground/70">{statusMessage}</p>
 
+      {/* 진화 준비 완료 — 임계값에 닿으면 나타나는 승급 버튼 */}
+      {target && !hibernating && (
+        <button
+          type="button"
+          onClick={() => setEvolveOpen(true)}
+          className="animate-pulse rounded-2xl border border-amber-300/60 bg-amber-400/15 py-3 text-sm font-bold transition active:scale-95"
+        >
+          ⬆️ 진화 준비 완료! LV.{level} → LV.{target}
+        </button>
+      )}
+
       {/* 액션 버튼 — 엄지 하나가 닿는 하단에 배치 */}
       <footer className="flex gap-3 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
         <button
@@ -165,6 +209,36 @@ export default function HomeScreen() {
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
       />
+
+      {/* 진화 시트 + 레벨업 플래시 */}
+      <AnimatePresence>
+        {evolveOpen && target && (
+          <EvolveSheet
+            key="evolve-sheet"
+            targetLevel={target}
+            onClose={() => setEvolveOpen(false)}
+          />
+        )}
+        {levelUpFlash && (
+          <motion.div
+            key="level-up-flash"
+            className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center bg-[radial-gradient(circle,rgba(255,255,255,0.9)_0%,rgba(255,214,120,0.4)_45%,transparent_75%)]"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: [0, 1, 1, 0] }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 1.8, times: [0, 0.15, 0.55, 1] }}
+          >
+            <motion.p
+              className="text-3xl font-black tracking-widest text-slate-900 drop-shadow"
+              initial={{ scale: 0.4 }}
+              animate={{ scale: [0.4, 1.15, 1] }}
+              transition={{ duration: 0.7, times: [0, 0.7, 1] }}
+            >
+              ⬆️ LV.{level} 진화!
+            </motion.p>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </main>
   );
 }
