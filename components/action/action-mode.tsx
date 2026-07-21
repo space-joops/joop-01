@@ -4,39 +4,47 @@ import { useEffect, useRef, useState } from "react";
 import type { PointerEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { usePetStore } from "@/stores/pet-store";
+import type { PetVariant } from "@/lib/supabase/types";
 
 /**
  * 액션 모드 (수동 관제·출격) — 45초 파편 청소 아케이드.
  *
- * 기획서의 제스처 3종이 그대로 전투 조작이 된다:
- *   Tap            ☄️ 작은 파편 레이저 요격 (+1)
- *   Drag           🪨 암석 회피 — 맞으면 내구도 -5 (하한 30)
- *   Hold & Release 🌟 골드 코어 조준·로봇 팔 포획 (+10, EXP 보너스)
+ * 줍이는 궤도 중심(화면 정중앙)에 고정되어 있고, 파편이 그 주위로
+ * 흘러 들어온다. 제스처 3종은 그대로 전투 조작이 된다:
+ *   Tap            작은 파편(볼트·너트·기어…) 레이저 요격 (+1)
+ *   Drag           경고 파편(샤프심 조각)을 직접 붙잡아 궤도 밖으로 밀어내기
+ *                  — 손을 안 대면 그대로 줍이에게 충돌해 내구도 -5 (하한 30)
+ *   Hold & Release 골드 코어 조준·로봇 팔(또는 그물·자석·레이저) 포획
  *
  * 구현 노트:
  * - rAF 게임 루프. 엔티티·통계는 ref에 두고(리렌더 무관), 프레임마다
  *   틱 카운터 하나만 setState해서 화면을 갱신한다.
- * - R3F를 쓰지 않는다 — 이모지 DOM ~15개면 충분하고, 미니게임 중
- *   GPU 부하(발열)를 아끼는 게 모바일 원칙(개발 원칙 3)에 맞다.
+ * - 비주얼은 이모지 대신 `plan/img/satellite pet svg pack`의 벡터 에셋을
+ *   그대로 씀(public/action/**) — 홈 화면 3D 팩과 팔레트가 같아 톤이 이어진다.
+ * - 줍이 스프라이트는 홈 화면 3D 모델 선택 로직(satellite-3d.tsx의
+ *   modelUrlFor)과 동일한 레벨/장비 분기를 따른다.
  * - 보상·피해는 라운드 종료에 finishSortie()로 한 번에 반영 —
  *   30초 동기화가 서버로 나른다.
  */
 
 /* ── 밸런스 상수: 라운드의 호흡 ── */
 const ROUND_SECONDS = 45;
-const SMALL_REWARD = 1; // ☄️ 요격 보상
+const SMALL_REWARD = 1; // 작은 파편 요격 보상
 const SMALL_EXP = 2;
-const GOLD_REWARD = 10; // 🌟 포획 보상
+const GOLD_REWARD = 10; // 골드 코어 포획 보상
 const GOLD_EXP = 15;
-const ROCK_DAMAGE = 5; // 🪨 피격 데미지
+const ROCK_DAMAGE = 5; // 경고 파편 피격 데미지
 const SMALL_SPAWN_EVERY = 0.9; // 초
 const ROCK_SPAWN_EVERY = 3.4;
 const GOLD_SPAWN_EVERY = 6.5; // 이 주기마다 확률 굴림
 const GOLD_CHANCE = 0.4;
 const HOLD_CHARGE_SECONDS = 1.0; // 조준 게이지 만충 시간
 const HOLD_MIN_CHARGE = 0.55; // 이만큼은 조준해야 포획 발사
-const PLAYER_Y = 84; // 줍이의 화면 세로 위치(%)
-const HIT_RANGE_X = 11; // 피격 판정 가로 반경(%)
+const CENTER_X = 50; // 줍이는 궤도 중심에 고정 — 더 이상 좌우로 움직이지 않는다
+const CENTER_Y = 46;
+const HIT_RANGE_X = 13; // 피격 판정 가로 반경(%)
+const HIT_RANGE_Y = 5; // 피격 판정 세로 반경(%)
+const ROCK_SPAWN_SPREAD = 30; // 경고 파편은 중심 근처로 쏠려서 떨어진다(진짜 위협이 되도록)
 
 interface Entity {
   id: number;
@@ -45,37 +53,67 @@ interface Entity {
   y: number;
   vy: number; // %/s
   vx: number;
+  src: string; // 표시할 SVG 경로
+  dragging?: boolean; // rock 전용 — 손가락으로 붙잡혀 있는 동안 낙하 정지
 }
 
 interface Particle {
   id: number;
   x: number;
   y: number;
-  emoji: string;
+  src: string;
+  size: number;
 }
 
-const ENTITY_EMOJI: Record<Entity["kind"], string> = {
-  small: "☄️",
-  rock: "🪨",
-  gold: "🌟",
-};
+const SMALL_DEBRIS_FILES = [
+  "bolt",
+  "nut",
+  "gear",
+  "chip",
+  "solar_fragment",
+  "antenna_piece",
+  "fuel_tank",
+];
+const smallDebrisSrc = () =>
+  `/action/debris/${SMALL_DEBRIS_FILES[Math.floor(Math.random() * SMALL_DEBRIS_FILES.length)]}.svg`;
+const ROCK_SRC = "/action/debris/shard.svg";
+const GOLD_SRC = "/action/debris/gold_core.svg";
+
+/** 줍이 스프라이트 — 홈 화면 3D 모델과 같은 레벨/장비 분기 (satellite-3d.tsx 참고) */
+function spriteFor(level: number, variant: PetVariant | null) {
+  if (level >= 3 && variant) return `/action/characters/pet_stage3_${variant}.svg`;
+  if (level >= 2) return "/action/characters/pet_stage2_junior.svg";
+  return "/action/characters/pet_stage1_baby.svg";
+}
+
+/** 포획 이펙트 — 3단계 장비마다 다른 연출을 준다 */
+function captureEffectFor(variant: PetVariant | null) {
+  if (variant === "net") return "/action/effects/fx_net_throw.svg";
+  if (variant === "magnet") return "/action/effects/fx_magnet_field.svg";
+  if (variant === "laser") return "/action/effects/fx_laser_beam.svg";
+  return "/action/effects/fx_collect_ring.svg";
+}
 
 interface ActionModeProps {
   onClose: () => void;
 }
 
 export default function ActionMode({ onClose }: ActionModeProps) {
+  const level = usePetStore((state) => state.level);
+  const variant = usePetStore((state) => state.variant);
+
   /* 게임 상태 — 전부 ref (rAF 루프가 직접 읽고 쓴다) */
   const entitiesRef = useRef<Entity[]>([]);
   const statsRef = useRef({ smalls: 0, golds: 0, hits: 0 });
-  const playerXRef = useRef(50);
   const spawnRef = useRef({ small: 0, rock: 2, gold: 3, nextId: 1 });
+  const containerRef = useRef<HTMLDivElement>(null);
   const holdRef = useRef<{
     moved: number;
     charge: number;
     active: boolean;
     lastX: number;
   }>({ moved: 0, charge: 0, active: false, lastX: 0 });
+  const dragRef = useRef<{ id: number } | null>(null);
 
   /* 렌더 상태 */
   const [, setTick] = useState(0); // 프레임마다 +1 — 리렌더 트리거
@@ -85,13 +123,23 @@ export default function ActionMode({ onClose }: ActionModeProps) {
   const [particles, setParticles] = useState<Particle[]>([]);
   const particleIdRef = useRef(1000);
 
-  const spawnParticle = (emoji: string, x: number, y: number) => {
+  const spawnParticle = (src: string, x: number, y: number, size = 44) => {
     const id = particleIdRef.current++;
-    setParticles((prev) => [...prev, { id, x, y, emoji }]);
+    setParticles((prev) => [...prev, { id, x, y, src, size }]);
     setTimeout(
       () => setParticles((prev) => prev.filter((p) => p.id !== id)),
       900,
     );
+  };
+
+  /* 화면 좌표(px) → 게임 좌표(%) */
+  const toPercent = (clientX: number, clientY: number) => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return { x: CENTER_X, y: CENTER_Y };
+    return {
+      x: ((clientX - rect.left) / rect.width) * 100,
+      y: ((clientY - rect.top) / rect.height) * 100,
+    };
   };
 
   /* ── 게임 루프 ── */
@@ -131,6 +179,7 @@ export default function ActionMode({ onClose }: ActionModeProps) {
           y: -6,
           vy: (14 + Math.random() * 10) * speedUp,
           vx: (Math.random() - 0.5) * 6,
+          src: smallDebrisSrc(),
         });
       }
       if (sp.rock <= 0) {
@@ -138,11 +187,15 @@ export default function ActionMode({ onClose }: ActionModeProps) {
         entities.push({
           id: sp.nextId++,
           kind: "rock",
-          // 암석은 줍이의 현재 위치를 노리고 떨어진다 — 회피를 강제!
-          x: Math.max(6, Math.min(94, playerXRef.current + (Math.random() - 0.5) * 24)),
+          // 경고 파편은 궤도 중심(줍이) 근처로 쏠려서 떨어진다 — 직접 밀어내야 한다!
+          x: Math.max(
+            6,
+            Math.min(94, CENTER_X + (Math.random() - 0.5) * ROCK_SPAWN_SPREAD),
+          ),
           y: -8,
-          vy: (17 + Math.random() * 6) * speedUp,
+          vy: (15 + Math.random() * 6) * speedUp,
           vx: 0,
+          src: ROCK_SRC,
         });
       }
       if (sp.gold <= 0) {
@@ -156,29 +209,32 @@ export default function ActionMode({ onClose }: ActionModeProps) {
             y: -6,
             vy: 6, // 천천히 — 조준할 시간을 준다
             vx: (Math.random() - 0.5) * 10,
+            src: GOLD_SRC,
           });
         }
       }
 
       // 이동·충돌
       for (const e of entities) {
+        if (e.dragging) continue; // 손가락으로 붙잡힌 파편은 낙하 정지
         e.y += e.vy * dt;
         e.x += e.vx * dt;
         if (e.x < 4 || e.x > 96) e.vx = -e.vx;
       }
       const survivors: Entity[] = [];
       for (const e of entities) {
-        // 암석 피격 판정: 줍이 높이에 도달했을 때 가로 거리로
+        // 경고 파편 피격 판정: 줍이(궤도 중심) 높이·가로 범위에 들어오면 충돌
         if (
           e.kind === "rock" &&
-          e.y >= PLAYER_Y - 4 &&
-          e.y <= PLAYER_Y + 6 &&
-          Math.abs(e.x - playerXRef.current) < HIT_RANGE_X
+          !e.dragging &&
+          e.y >= CENTER_Y - HIT_RANGE_Y &&
+          e.y <= CENTER_Y + HIT_RANGE_Y + 4 &&
+          Math.abs(e.x - CENTER_X) < HIT_RANGE_X
         ) {
           statsRef.current.hits += 1;
           setShakeNonce((n) => n + 1);
-          spawnParticle("💥", e.x, e.y);
-          continue; // 충돌한 암석은 소멸
+          spawnParticle("/action/effects/fx_alert.svg", CENTER_X, CENTER_Y, 56);
+          continue; // 충돌한 파편은 소멸
         }
         if (e.y < 108) survivors.push(e); // 화면 밖으로 나가면 소멸
       }
@@ -198,8 +254,8 @@ export default function ActionMode({ onClose }: ActionModeProps) {
     return () => cancelAnimationFrame(raf);
   }, [phase]);
 
-  /* ── 제스처: Drag(회피) / Hold&Release(포획) — 컨테이너 레벨 ── */
-  const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
+  /* ── 제스처: Hold&Release(포획) — 배경 레벨 ── */
+  const handleBackgroundPointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (phase !== "play") return;
     event.currentTarget.setPointerCapture(event.pointerId);
     holdRef.current = {
@@ -210,38 +266,33 @@ export default function ActionMode({ onClose }: ActionModeProps) {
     };
   };
 
-  const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
+  const handleBackgroundPointerMove = (event: PointerEvent<HTMLDivElement>) => {
     if (phase !== "play" || !holdRef.current.active) return;
-    const rect = event.currentTarget.getBoundingClientRect();
-    const x = ((event.clientX - rect.left) / rect.width) * 100;
     holdRef.current.moved += Math.abs(event.clientX - holdRef.current.lastX);
     holdRef.current.lastX = event.clientX;
-    // 조금이라도 끌면 조준 대신 회피 기동 — 줍이가 손가락을 따라간다
+    // 조준 중 손가락이 흔들리면(끌리면) 조준이 풀린다 — 가만히 눌러야 충전된다
     if (holdRef.current.moved > 8) {
       holdRef.current.charge = 0;
-      playerXRef.current = Math.max(6, Math.min(94, x));
     }
   };
 
-  const handlePointerUp = () => {
+  const handleBackgroundPointerUp = () => {
     if (phase !== "play") return;
     const hold = holdRef.current;
     holdRef.current = { moved: 0, charge: 0, active: false, lastX: 0 };
-    // Hold & Release: 충분히 조준했다면 가장 가까운 골드 코어를 로봇 팔로 포획
+    // Hold & Release: 충분히 조준했다면 궤도 중심에서 가장 가까운 골드 코어를 포획
     if (hold.moved <= 8 && hold.charge >= HOLD_MIN_CHARGE) {
       const golds = entitiesRef.current.filter((e) => e.kind === "gold");
       if (golds.length > 0) {
         const target = golds.reduce((a, b) =>
-          Math.abs(a.x - playerXRef.current) < Math.abs(b.x - playerXRef.current)
-            ? a
-            : b,
+          Math.abs(a.x - CENTER_X) < Math.abs(b.x - CENTER_X) ? a : b,
         );
         entitiesRef.current = entitiesRef.current.filter(
           (e) => e.id !== target.id,
         );
         statsRef.current.golds += 1;
-        spawnParticle("🦾", playerXRef.current, PLAYER_Y - 6);
-        spawnParticle("✨", target.x, target.y);
+        spawnParticle(captureEffectFor(variant), CENTER_X, CENTER_Y - 6, 64);
+        spawnParticle("/action/effects/fx_sparkle.svg", target.x, target.y, 40);
       }
     }
   };
@@ -254,7 +305,39 @@ export default function ActionMode({ onClose }: ActionModeProps) {
       (e) => e.id !== entity.id,
     );
     statsRef.current.smalls += 1;
-    spawnParticle("⚡", entity.x, entity.y);
+    spawnParticle("/action/effects/fx_sparkle.svg", entity.x, entity.y, 36);
+  };
+
+  /* Drag: 경고 파편을 직접 붙잡아 궤도 중심 밖으로 밀어낸다 */
+  const grabRock = (entity: Entity) => (event: PointerEvent) => {
+    if (phase !== "play") return;
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    entity.dragging = true;
+    dragRef.current = { id: entity.id };
+    setTick((t) => t + 1);
+  };
+
+  const dragRockMove = (entity: Entity) => (event: PointerEvent) => {
+    if (phase !== "play" || dragRef.current?.id !== entity.id) return;
+    event.stopPropagation();
+    const { x, y } = toPercent(event.clientX, event.clientY);
+    entity.x = Math.max(2, Math.min(98, x));
+    entity.y = Math.max(2, Math.min(104, y));
+    setTick((t) => t + 1);
+  };
+
+  const releaseRock = (entity: Entity) => (event: PointerEvent) => {
+    if (phase !== "play" || dragRef.current?.id !== entity.id) return;
+    event.stopPropagation();
+    entity.dragging = false;
+    dragRef.current = null;
+    // 중심에서 충분히 밀어냈으면 안전하게 회피 성공 — 그대로 두면 다시 떨어진다
+    if (Math.abs(entity.x - CENTER_X) > HIT_RANGE_X + 3) {
+      entitiesRef.current = entitiesRef.current.filter((e) => e.id !== entity.id);
+      spawnParticle("/action/effects/fx_sparkle.svg", entity.x, entity.y, 32);
+    }
+    setTick((t) => t + 1);
   };
 
   /* ── 결과 정산 ── */
@@ -276,51 +359,60 @@ export default function ActionMode({ onClose }: ActionModeProps) {
 
   return (
     <motion.div
-      className="absolute inset-0 z-50 overflow-hidden bg-[radial-gradient(ellipse_at_top,#101433_0%,#05060f_80%)]"
+      className="absolute inset-0 z-50 overflow-hidden bg-[#0b1026]"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
     >
+      {/* 배경 — 별과 지구 (SVG 팩 원본 그대로) */}
+      <img
+        src="/action/background/bg_space_portrait.svg"
+        alt=""
+        aria-hidden
+        className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+      />
+
       {/* 피격 흔들림 — nonce가 바뀔 때마다 짧게 요동 */}
       <motion.div
+        ref={containerRef}
         key={shakeNonce}
         className="absolute inset-0 touch-game"
         animate={
           shakeNonce > 0 ? { x: [0, -8, 7, -4, 0], y: [0, 4, -3, 2, 0] } : {}
         }
         transition={{ duration: 0.35 }}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
+        onPointerDown={handleBackgroundPointerDown}
+        onPointerMove={handleBackgroundPointerMove}
+        onPointerUp={handleBackgroundPointerUp}
+        onPointerCancel={handleBackgroundPointerUp}
       >
-        {/* HUD */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 p-4 pt-[max(1rem,env(safe-area-inset-top))]">
-          <div className="flex items-center justify-between text-xs font-semibold">
-            <span className="tracking-[0.2em] text-foreground/50">
-              수동 관제 모드
-            </span>
-            <span>
-              ☄️ +{rewardDebris}
+        {/* HUD — 상단 진행 바 */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-1.5 overflow-hidden bg-white/10">
+          <div
+            className="h-full bg-emerald-400 transition-[width] duration-1000 ease-linear"
+            style={{ width: `${(timeLeft / ROUND_SECONDS) * 100}%` }}
+          />
+        </div>
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-center justify-between p-4 pt-[max(1.25rem,calc(env(safe-area-inset-top)+0.5rem))]">
+          <span className="text-xs font-semibold tracking-[0.2em] text-white/60">
+            수동 관제 모드
+          </span>
+          <span className="text-right text-xs font-semibold text-white/80">
+            <span className="block">
+              🛰 +{rewardDebris}
               {stats.hits > 0 && (
-                <span className="ml-2 text-rose-300">💥 {stats.hits}</span>
+                <span className="ml-2 text-rose-300">⚠ {stats.hits}</span>
               )}
             </span>
-          </div>
-          {/* 남은 시간 바 */}
-          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
-            <div
-              className="h-full rounded-full bg-sky-400 transition-[width] duration-1000 ease-linear"
-              style={{ width: `${(timeLeft / ROUND_SECONDS) * 100}%` }}
-            />
-          </div>
+            <span className="block text-white/40">T-{timeLeft}s</span>
+          </span>
         </div>
 
-        {/* 조기 귀환 버튼 */}
+        {/* 조기 귀환 버튼 — 좌상단 */}
         <button
           type="button"
           onClick={() => setPhase("result")}
-          className="absolute right-3 top-[max(3.2rem,calc(env(safe-area-inset-top)+2.4rem))] z-20 flex h-9 w-9 items-center justify-center rounded-full border border-panel-border bg-black/40 text-sm"
+          className="pointer-events-auto absolute left-3 top-[max(3.4rem,calc(env(safe-area-inset-top)+2.6rem))] z-20 flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-black/40 text-sm text-white"
           aria-label="조기 귀환"
         >
           ✕
@@ -328,47 +420,65 @@ export default function ActionMode({ onClose }: ActionModeProps) {
 
         {/* 파편들 */}
         {entitiesRef.current.map((e) => (
-          <span
+          <img
             key={e.id}
-            onPointerDown={e.kind === "small" ? shootSmall(e) : undefined}
+            src={e.src}
+            alt=""
+            aria-hidden
+            onPointerDown={
+              e.kind === "small"
+                ? shootSmall(e)
+                : e.kind === "rock"
+                  ? grabRock(e)
+                  : undefined
+            }
+            onPointerMove={e.kind === "rock" ? dragRockMove(e) : undefined}
+            onPointerUp={e.kind === "rock" ? releaseRock(e) : undefined}
+            onPointerCancel={e.kind === "rock" ? releaseRock(e) : undefined}
             className={
               e.kind === "small"
-                ? "absolute -translate-x-1/2 -translate-y-1/2 p-2 text-2xl" // p-2: 엄지 판정 여유
+                ? "absolute -translate-x-1/2 -translate-y-1/2 p-1.5" // 엄지 판정 여유
                 : e.kind === "rock"
-                  ? "pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 text-4xl"
-                  : "pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 animate-pulse text-3xl"
+                  ? `absolute -translate-x-1/2 -translate-y-1/2 touch-none ${e.dragging ? "drop-shadow-[0_0_10px_rgba(255,139,126,0.9)]" : "drop-shadow-[0_0_6px_rgba(255,139,126,0.5)]"}`
+                  : "pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 animate-pulse"
             }
-            style={{ left: `${e.x}%`, top: `${e.y}%` }}
-          >
-            {ENTITY_EMOJI[e.kind]}
-          </span>
+            style={{
+              left: `${e.x}%`,
+              top: `${e.y}%`,
+              width: e.kind === "small" ? 40 : e.kind === "rock" ? 52 : 44,
+              height: e.kind === "small" ? 40 : e.kind === "rock" ? 52 : 44,
+            }}
+          />
         ))}
 
         {/* 터치 피드백 파티클 */}
         {particles.map((p) => (
-          <span
+          <img
             key={p.id}
-            className="animate-particle-rise pointer-events-none absolute text-2xl"
-            style={{ left: `${p.x}%`, top: `${p.y}%` }}
+            src={p.src}
+            alt=""
             aria-hidden
-          >
-            {p.emoji}
-          </span>
+            className="animate-particle-rise pointer-events-none absolute -translate-x-1/2 -translate-y-1/2"
+            style={{ left: `${p.x}%`, top: `${p.y}%`, width: p.size, height: p.size }}
+          />
         ))}
 
-        {/* 줍이 — 드래그를 따라 움직인다 */}
-        <div
-          className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 text-5xl drop-shadow-[0_0_18px_rgba(129,140,248,0.6)]"
-          style={{ left: `${playerXRef.current}%`, top: `${PLAYER_Y}%` }}
-        >
-          🛰️
-        </div>
+        {/* 줍이 — 궤도 중심에 고정, 살짝 떠 있는 정도로만 흔들린다 */}
+        <motion.img
+          src={spriteFor(level, variant)}
+          alt=""
+          aria-hidden
+          className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 drop-shadow-[0_0_18px_rgba(129,140,248,0.6)]"
+          style={{ left: `${CENTER_X}%`, top: `${CENTER_Y}%`, width: 96, height: 96 }}
+          animate={{ y: [0, -4, 0] }}
+          transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+        />
 
         {/* 조준 게이지 — Hold 중에만 줍이 위에 차오른다 */}
         {charge > 0.05 && (
           <div
             className="pointer-events-none absolute h-1.5 w-16 -translate-x-1/2 overflow-hidden rounded-full bg-white/15"
-            style={{ left: `${playerXRef.current}%`, top: `${PLAYER_Y - 9}%` }}
+            style={{ left: `${CENTER_X}%`, top: `${CENTER_Y - 11}%` }}
           >
             <div
               className={`h-full rounded-full ${charge >= HOLD_MIN_CHARGE ? "bg-amber-300" : "bg-white/50"}`}
@@ -380,11 +490,11 @@ export default function ActionMode({ onClose }: ActionModeProps) {
         {/* 첫 3초 조작 안내 — 텍스트 최소화 (온보딩 원칙) */}
         {timeLeft > ROUND_SECONDS - 3 && (
           <motion.p
-            className="pointer-events-none absolute inset-x-0 top-1/3 text-center text-xs text-foreground/70"
+            className="pointer-events-none absolute inset-x-0 top-1/4 text-center text-xs text-white/70"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
           >
-            ☄️ 탭! · 🪨 끌어서 피하기! · 🌟 꾹 눌렀다 떼기!
+            톡톡 탭! · 경고 파편은 끌어서 치우기! · 꾹 눌렀다 떼기!
           </motion.p>
         )}
       </motion.div>
@@ -414,11 +524,11 @@ export default function ActionMode({ onClose }: ActionModeProps) {
               </p>
               <div className="mt-4 space-y-2 rounded-2xl bg-black/30 p-4 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-foreground/70">☄️ 요격한 파편</span>
+                  <span className="text-foreground/70">요격한 파편</span>
                   <span className="font-bold">{stats.smalls}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-foreground/70">🌟 포획한 골드 코어</span>
+                  <span className="text-foreground/70">포획한 골드 코어</span>
                   <span className="font-bold">{stats.golds}</span>
                 </div>
                 <div className="flex justify-between">
@@ -429,7 +539,7 @@ export default function ActionMode({ onClose }: ActionModeProps) {
                 </div>
                 {durabilityLoss > 0 && (
                   <div className="flex justify-between">
-                    <span className="text-foreground/70">💥 피격 손상</span>
+                    <span className="text-foreground/70">피격 손상</span>
                     <span className="font-bold text-rose-300">
                       내구도 −{durabilityLoss}%
                     </span>
