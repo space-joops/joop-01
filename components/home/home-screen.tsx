@@ -17,6 +17,7 @@ import PetSatellite from "@/components/home/pet-satellite";
 import ConsoleSettings from "@/components/home/console-settings";
 import EvolveSheet, { VARIANT_INFO } from "@/components/home/evolve-sheet";
 import ActionMode from "@/components/action/action-mode";
+import UpgradeSheet from "@/components/home/upgrade-sheet";
 
 /**
  * 홈 화면 (관제 콘솔) — 헤더 · 게이지 · 펫 · 액션 버튼을 조립한다.
@@ -55,6 +56,8 @@ export default function HomeScreen() {
 
   // 관제 설정 시트 (알림 · 설치 · 버전 정보)
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // 기체 강화 시트 (파편 소비처)
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
 
   // 진화: 다음 목표 레벨(임계값 도달 시), 시트 열림, 레벨업 플래시
   const target = evolveTarget(level, exp);
@@ -228,7 +231,7 @@ export default function HomeScreen() {
       )}
 
       {/* 액션 버튼 — 엄지 하나가 닿는 하단에 배치 */}
-      <footer className="flex gap-3 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+      <footer className="flex gap-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
         <button
           type="button"
           onClick={chargeSolar}
@@ -236,6 +239,15 @@ export default function HomeScreen() {
           className="flex-1 rounded-2xl border border-panel-border bg-panel py-3.5 text-sm font-semibold transition active:scale-95 disabled:opacity-40"
         >
           ☀️ 태양광 충전
+        </button>
+        <button
+          type="button"
+          onClick={() => setUpgradeOpen(true)}
+          disabled={hibernating}
+          className="rounded-2xl border border-panel-border bg-panel px-4 py-3.5 text-sm font-semibold transition active:scale-95 disabled:opacity-40"
+          aria-label="기체 강화"
+        >
+          🔧
         </button>
         <button
           type="button"
@@ -260,6 +272,13 @@ export default function HomeScreen() {
       <AnimatePresence>
         {sortieOpen && (
           <ActionMode key="sortie" onClose={() => setSortieOpen(false)} />
+        )}
+      </AnimatePresence>
+
+      {/* 기체 강화 시트 */}
+      <AnimatePresence>
+        {upgradeOpen && (
+          <UpgradeSheet key="upgrade" onClose={() => setUpgradeOpen(false)} />
         )}
       </AnimatePresence>
 
