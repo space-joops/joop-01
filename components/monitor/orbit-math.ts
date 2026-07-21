@@ -45,10 +45,7 @@ const DEG = Math.PI / 180;
 const RAD = 180 / Math.PI;
 
 /** 경도를 [-180, 180) 범위로 접는다 */
-export const wrapLon = (lon: number) => {
-  let x = ((lon + 180) % 360 + 360) % 360;
-  return x - 180;
-};
+export const wrapLon = (lon: number) => ((((lon + 180) % 360) + 360) % 360) - 180;
 
 export interface GeoPoint {
   lat: number;
