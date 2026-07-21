@@ -13,6 +13,7 @@ import {
   petSprite,
   preloadList,
 } from "@/components/action/sortie-assets";
+import AmbientOrbit from "@/components/action/ambient-orbit";
 import SortieField, {
   type SortieResult,
 } from "@/components/action/sortie-field";
@@ -97,6 +98,9 @@ export default function ActionMode({ onClose }: ActionModeProps) {
         className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-80"
         draggable={false}
       />
+
+      {/* 배경 궤도 연출 — 게임 레이어보다 뒤, 피격 흔들림 밖 (원경은 흔들리지 않는다) */}
+      <AmbientOrbit />
 
       {/* ── 비행 — 게임 본체 ── */}
       {phase === "play" && zone && (
