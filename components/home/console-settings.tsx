@@ -13,6 +13,11 @@ import {
 import { sendPushToSelf } from "@/app/actions/push";
 import { PUSH_MESSAGES, type PushMessageKey } from "@/lib/push-messages";
 import { usePwaStore } from "@/stores/pwa-store";
+import {
+  usePetStore,
+  SORTIE_BATTERY_COST,
+  SORTIE_MIN_BATTERY,
+} from "@/stores/pet-store";
 
 /**
  * 관제 설정 시트 — 헤더의 ⚙️ 버튼으로 여는 하단 시트.
@@ -21,6 +26,36 @@ import { usePwaStore } from "@/stores/pwa-store";
  * 버전 표기가 여기 "정식으로" 있고, 헤더 캡션에도 아주 작게 상시 노출된다 —
  * 배포가 잘 반영됐는지는 헤더만 봐도 알 수 있게.
  */
+
+/** 즉시 출격 줄 — 배터리·동면 조건을 보여주고, 가능할 때만 버튼을 살린다 */
+function SortieLaunchRow({ onSortie }: { onSortie: () => void }) {
+  const battery = usePetStore((state) => state.battery);
+  const mood = usePetStore((state) => state.mood);
+  const ready = mood !== "hibernate" && battery >= SORTIE_MIN_BATTERY;
+
+  return (
+    <div className="mb-3 flex items-center justify-between gap-3 rounded-2xl border border-panel-border bg-background/50 p-4">
+      <div>
+        <p className="text-sm font-semibold">🚀 수동 출격</p>
+        <p className="mt-0.5 text-[11px] leading-snug text-foreground/55">
+          {mood === "hibernate"
+            ? "동면 중이에요 — 먼저 쓰다듬어 깨워 주세요."
+            : battery < SORTIE_MIN_BATTERY
+              ? `배터리가 부족해요 (${SORTIE_MIN_BATTERY} 이상 필요). ☀️ 충전 먼저!`
+              : "레이더 신호를 기다리지 않고 바로 파편 청소에 나서요."}
+        </p>
+      </div>
+      <button
+        type="button"
+        disabled={!ready}
+        onClick={onSortie}
+        className="shrink-0 rounded-xl bg-sky-400/90 px-3.5 py-2 text-xs font-semibold text-background transition active:scale-95 disabled:opacity-40"
+      >
+        출격 (🔋 -{SORTIE_BATTERY_COST})
+      </button>
+    </div>
+  );
+}
 
 /** 푸시 기능의 현재 상황 — UI가 이 상태 기계를 따라 그려진다 */
 type PushStatus =
@@ -38,9 +73,12 @@ const TEST_MESSAGE_KEYS = Object.keys(PUSH_MESSAGES) as PushMessageKey[];
 export default function ConsoleSettings({
   open,
   onClose,
+  onSortie,
 }: {
   open: boolean;
   onClose: () => void;
+  /** 즉시 출격 — 홈 화면의 출격 경로(배터리 차감 포함)를 그대로 태운다 */
+  onSortie: () => void;
 }) {
   const isStandalone = usePwaStore((state) => state.isStandalone);
   const installPrompt = usePwaStore((state) => state.installPrompt);
@@ -169,6 +207,9 @@ export default function ConsoleSettings({
                 ✕
               </button>
             </header>
+
+            {/* ── 즉시 출격 — 레이더 신호를 기다리지 않는 수동 출격 ── */}
+            <SortieLaunchRow onSortie={onSortie} />
 
             {/* ── 관제 알림 (웹 푸시) ── */}
             <div className="rounded-2xl border border-panel-border bg-background/50 p-4">

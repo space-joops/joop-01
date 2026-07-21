@@ -88,12 +88,12 @@ export default function HomeScreen() {
       const s = usePetStore.getState();
       const { open, banner } = sortieStateRef.current;
       const awake = s.mood !== "hibernate" && s.battery > 0;
-      // 15초마다 22% 확률 — 평균 1~2분에 한 번 레이더가 울린다
-      if (!open && !banner && awake && s.battery >= 20 && Math.random() < 0.22) {
+      // 10초마다 35% 확률 — 평균 30초에 한 번 레이더가 울린다 (액션 비중 상향)
+      if (!open && !banner && awake && s.battery >= 20 && Math.random() < 0.35) {
         setSortieBanner(true);
         setTimeout(() => setSortieBanner(false), 20_000); // 20초 내 미응답 시 소멸
       }
-    }, 15_000);
+    }, 10_000);
     return () => clearInterval(roll);
   }, []);
 
@@ -276,6 +276,11 @@ export default function HomeScreen() {
       <ConsoleSettings
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
+        onSortie={() => {
+          // 설정 시트에서 즉시 출격 — 배너와 같은 경로라 비용·조건도 동일
+          setSettingsOpen(false);
+          enterSortie();
+        }}
       />
 
       {/* 출격 — 수동 관제 모드 전체 화면 */}
