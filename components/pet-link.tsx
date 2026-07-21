@@ -69,6 +69,7 @@ export default function PetLink({ onSettlement }: PetLinkProps) {
         .hydrateFromServer(result.pet, {
           keepMood: !result.settlement?.settled,
         });
+      usePetStore.getState().setUpgrades(result.upgrades);
       dirty.current = false; // hydrate로 인한 변경은 동기화 대상이 아니다
       linked.current = true;
 

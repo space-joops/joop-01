@@ -2,10 +2,13 @@
 
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type {
+  BuyUpgradeResult,
   EvolveResult,
   OfflineSettlement,
   PetRow,
   PetVariant,
+  UpgradeKey,
+  UpgradeLevels,
 } from "@/lib/supabase/types";
 
 /**
@@ -22,8 +25,26 @@ import type {
  */
 
 export type BootPetResult =
-  | { ok: true; pet: PetRow; settlement: OfflineSettlement | null; isNew: boolean }
+  | {
+      ok: true;
+      pet: PetRow;
+      settlement: OfflineSettlement | null;
+      upgrades: UpgradeLevels;
+      isNew: boolean;
+    }
   | { ok: false; reason: "not-configured" | "no-session" | "error"; error?: string };
+
+/** 인벤토리의 upgrade_* 행들을 레벨 묶음으로 변환 */
+function toUpgradeLevels(
+  rows: { item_key: string; qty: number }[] | null,
+): UpgradeLevels {
+  const levels: UpgradeLevels = { cargo: 0, ai_core: 0, solar: 0 };
+  for (const row of rows ?? []) {
+    const key = row.item_key.replace(/^upgrade_/, "") as UpgradeKey;
+    if (key in levels) levels[key] = row.qty;
+  }
+  return levels;
+}
 
 /** 접속 부팅 — 펫을 확보하고, 자리 비운 시간을 DB 시간 기준으로 정산한다 */
 export async function bootPet(): Promise<BootPetResult> {
@@ -45,7 +66,15 @@ export async function bootPet(): Promise<BootPetResult> {
     return { ok: false, reason: "error", error: selectError.message };
   }
 
-  // 2) 첫 접속이면 기본값으로 부화 — 갓 태어난 펫은 정산할 과거가 없다
+  // 2) 업그레이드 레벨 로드 (없으면 전부 0)
+  const { data: inventoryRows } = await supabase
+    .from("joop_01_inventory")
+    .select("item_key,qty")
+    .eq("user_id", user.id)
+    .like("item_key", "upgrade_%");
+  const upgrades = toUpgradeLevels(inventoryRows);
+
+  // 3) 첫 접속이면 기본값으로 부화 — 갓 태어난 펫은 정산할 과거가 없다
   if (!existing) {
     const { data: created, error: insertError } = await supabase
       .from("joop_01_pets")
@@ -55,17 +84,29 @@ export async function bootPet(): Promise<BootPetResult> {
     if (insertError || !created) {
       return { ok: false, reason: "error", error: insertError?.message };
     }
-    return { ok: true, pet: created as PetRow, settlement: null, isNew: true };
+    return {
+      ok: true,
+      pet: created as PetRow,
+      settlement: null,
+      upgrades,
+      isNew: true,
+    };
   }
 
-  // 3) 오프라인 정산 — 시간 계산은 전부 DB의 now() 기준 (개발 원칙 4)
+  // 4) 오프라인 정산 — 시간 계산은 전부 DB의 now() 기준 (개발 원칙 4)
   const { data: settlement, error: rpcError } = await supabase.rpc(
     "joop_01_settle_offline",
   );
   if (rpcError) {
     // 정산이 실패해도 게임은 계속되어야 한다 — 마지막 상태로 입장
     console.error("[pet] 오프라인 정산 실패:", rpcError.message);
-    return { ok: true, pet: existing as PetRow, settlement: null, isNew: false };
+    return {
+      ok: true,
+      pet: existing as PetRow,
+      settlement: null,
+      upgrades,
+      isNew: false,
+    };
   }
 
   const result = settlement as OfflineSettlement;
@@ -74,8 +115,30 @@ export async function bootPet(): Promise<BootPetResult> {
     // 정산이 일어났으면 정산 후 상태가 최신이다
     pet: result.settled && result.pet ? result.pet : (existing as PetRow),
     settlement: result,
+    upgrades,
     isNew: false,
   };
+}
+
+export type BuyUpgradeActionResult =
+  | (BuyUpgradeResult & { configured: true })
+  | { configured: false };
+
+/** 강화 구매 — 비용 검증·차감은 전부 DB 함수 안에서 */
+export async function buyUpgrade(
+  key: UpgradeKey,
+): Promise<BuyUpgradeActionResult> {
+  const supabase = await getSupabaseServerClient();
+  if (!supabase) return { configured: false };
+
+  const { data, error } = await supabase.rpc("joop_01_buy_upgrade", {
+    p_key: key,
+  });
+  if (error) {
+    console.error("[pet] 강화 구매 실패:", error.message);
+    return { configured: true, ok: false };
+  }
+  return { configured: true, ...(data as BuyUpgradeResult) };
 }
 
 /** 클라이언트 스토어의 스냅샷 — 서버(DB 함수)가 한 번 더 검증·클램프한다 */

@@ -31,6 +31,24 @@ export interface PetRow {
   updated_at: string;
 }
 
+/** 방치형 업그레이드 종류 — inventory에 upgrade_<key>로 저장된다 */
+export type UpgradeKey = "cargo" | "ai_core" | "solar";
+
+/** 업그레이드 현재 레벨 묶음 */
+export type UpgradeLevels = Record<UpgradeKey, number>;
+
+/** joop_01_buy_upgrade() RPC가 돌려주는 구매 결과 */
+export interface BuyUpgradeResult {
+  ok: boolean;
+  reason?: "invalid_key" | "max_level" | "not_enough";
+  /** not_enough일 때 필요한 파편 */
+  need?: number;
+  key?: UpgradeKey;
+  level?: number;
+  cost?: number;
+  pet?: PetRow;
+}
+
 /** joop_01_evolve_pet() RPC가 돌려주는 승급 결과 */
 export interface EvolveResult {
   ok: boolean;

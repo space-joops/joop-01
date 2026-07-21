@@ -1,6 +1,11 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { PetRow, PetVariant } from "@/lib/supabase/types";
+import type {
+  PetRow,
+  PetVariant,
+  UpgradeKey,
+  UpgradeLevels,
+} from "@/lib/supabase/types";
 
 /**
  * 펫(위성) 3대 상태 지표 스토어 — 게임의 두뇌.
@@ -57,6 +62,20 @@ export const SORTIE_BATTERY_COST = 10;
 /** 이 밑으로는 출격 불가 — 돌아올 연료는 남겨둬야 한다 */
 export const SORTIE_MIN_BATTERY = 20;
 
+/**
+ * 업그레이드 비용 곡선 — DB 함수(joop_01_buy_upgrade)의 미러.
+ * 인덱스 = 현재 레벨 (Lv.0→1이 costs[0]). 최대 Lv.5.
+ */
+export const UPGRADE_COSTS = [50, 90, 160, 290, 520] as const;
+export const UPGRADE_MAX_LEVEL = 5;
+
+/** 화물칸 압축 계수 — 파편당 데이터 축적이 레벨마다 20%씩 준다 */
+export const cargoDataFactor = (cargoLevel: number) =>
+  1 / (1 + 0.25 * cargoLevel);
+/** 태양광 충전량 — 기본 18에 레벨당 +25% */
+export const solarChargeAmount = (solarLevel: number) =>
+  Math.round(18 * (1 + 0.25 * solarLevel));
+
 /** 값을 [min, max] 범위로 잘라내는 유틸 (파이썬의 max(min(v, hi), lo)) */
 const clamp = (value: number, min = 0, max = GAUGE_MAX) =>
   Math.min(max, Math.max(min, value));
@@ -80,6 +99,8 @@ interface PetState {
   mood: PetMood;
   /** 현재 무드를 푸는 데 쌓인 쓰다듬기 횟수 */
   moodProgress: number;
+  /** 방치형 업그레이드 레벨 — 진실은 서버 inventory, 여기는 미러 */
+  upgrades: UpgradeLevels;
 
   /** [Tap] 파편 냠냠 — 자원 획득, 데이터가 쌓이고 배터리를 조금 쓴다 */
   eatDebris: () => void;
@@ -96,6 +117,10 @@ interface PetState {
    * 서버 연동 시엔 evolvePet 액션 결과를 hydrateFromServer로 반영한다.
    */
   evolveLocal: (variant: PetVariant | null) => void;
+  /** 서버에서 로드한 업그레이드 레벨 반영 */
+  setUpgrades: (levels: UpgradeLevels) => void;
+  /** 로컬 모드 전용 강화 구매 — 서버 연동 시엔 buyUpgrade 액션 결과 사용 */
+  buyUpgradeLocal: (key: UpgradeKey) => void;
   /** 출격 — 배터리를 소모하고 액션 모드로. 조건 미달이면 false */
   startSortie: () => boolean;
   /** 귀환 — 라운드 결과(보상·피해)를 한 번에 반영한다 */
@@ -125,6 +150,7 @@ export const usePetStore = create<PetState>()(
       variant: null,
       mood: "active",
       moodProgress: 0,
+      upgrades: { cargo: 0, ai_core: 0, solar: 0 },
 
       eatDebris: () =>
         set((state) => {
@@ -136,7 +162,10 @@ export const usePetStore = create<PetState>()(
             state.dataUsed >= GAUGE_MAX ? FULL_DATA_EFFICIENCY : 1;
           return {
             debris: state.debris + 1 * efficiency,
-            dataUsed: clamp(state.dataUsed + 6),
+            // 화물칸 압축: 레벨이 오를수록 데이터가 덜 쌓인다
+            dataUsed: clamp(
+              state.dataUsed + 6 * cargoDataFactor(state.upgrades.cargo),
+            ),
             battery: clamp(state.battery - 2),
             exp: state.exp + 2,
           };
@@ -175,7 +204,11 @@ export const usePetStore = create<PetState>()(
         set((state) =>
           state.mood === "hibernate"
             ? state
-            : { battery: clamp(state.battery + 18) },
+            : {
+                battery: clamp(
+                  state.battery + solarChargeAmount(state.upgrades.solar),
+                ),
+              },
         ),
 
       tickIdle: () =>
@@ -194,14 +227,30 @@ export const usePetStore = create<PetState>()(
         set((state) => ({
           debris: state.debris + debris,
           exp: state.exp + exp,
-          // 수집하면 데이터도 쌓인다 — 오프라인 정산과 같은 비율(파편 1 = 데이터 1)
-          dataUsed: clamp(state.dataUsed + debris),
+          // 수집하면 데이터도 쌓인다 — 오프라인 정산과 같은 비율 + 화물칸 압축
+          dataUsed: clamp(
+            state.dataUsed + debris * cargoDataFactor(state.upgrades.cargo),
+          ),
           // 충돌 데미지 하한선: 이미 하한 밑이면 현재값 유지 (기획서 원칙)
           durability: Math.max(
             Math.min(DURABILITY_FLOOR, state.durability),
             state.durability - durabilityLoss,
           ),
         })),
+
+      setUpgrades: (levels) => set({ upgrades: levels }),
+
+      buyUpgradeLocal: (key) =>
+        set((state) => {
+          const level = state.upgrades[key];
+          if (level >= UPGRADE_MAX_LEVEL) return state;
+          const cost = UPGRADE_COSTS[level];
+          if (state.debris < cost) return state;
+          return {
+            debris: state.debris - cost,
+            upgrades: { ...state.upgrades, [key]: level + 1 },
+          };
+        }),
 
       evolveLocal: (variant) =>
         set((state) => {
@@ -245,6 +294,7 @@ export const usePetStore = create<PetState>()(
         variant: state.variant,
         mood: state.mood,
         moodProgress: state.moodProgress,
+        upgrades: state.upgrades,
       }),
     },
   ),
