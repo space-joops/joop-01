@@ -46,6 +46,9 @@ export const UI_SRC = {
 /** 세로(9:16) 우주 배경 */
 export const BG_SPACE_SRC = "/game/bg/bg_space_portrait.svg";
 
+/** 배경 궤도 연출용 원경 위성 — 보조 드론 (게임플레이와 무관한 장식) */
+export const AMBIENT_SAT_SRC = "/game/pet/support_drone.svg";
+
 /**
  * 진화 단계·장비 분기에 맞는 펫 스프라이트 경로.
  * happy=true면 프리베이크된 기쁨 포즈(결과 화면용)를 쓴다.
