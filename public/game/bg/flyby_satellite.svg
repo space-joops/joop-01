@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 96" width="192" height="96" fill="none">
+  <!-- 플라이바이용 사실풍 인공위성 — 금박(카프톤) 버스 + 태양전지 어레이 + 접시 안테나 -->
+  <defs>
+    <linearGradient id="foil" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#E8C555"/>
+      <stop offset="0.55" stop-color="#C9A227"/>
+      <stop offset="1" stop-color="#8A6D1B"/>
+    </linearGradient>
+    <linearGradient id="cell" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2E5AA8"/>
+      <stop offset="0.5" stop-color="#1B3B6F"/>
+      <stop offset="1" stop-color="#12294E"/>
+    </linearGradient>
+    <linearGradient id="dish" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#EDF1F7"/>
+      <stop offset="1" stop-color="#AEB8C6"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 연결 붐(지지대) -->
+  <rect x="70" y="44" width="14" height="8" rx="1.5" fill="#5A6472"/>
+  <rect x="108" y="44" width="14" height="8" rx="1.5" fill="#5A6472"/>
+  <rect x="72" y="46" width="10" height="1.6" fill="#8892A0"/>
+  <rect x="110" y="46" width="10" height="1.6" fill="#8892A0"/>
+
+  <!-- 좌측 태양전지 어레이 (3분할 패널) -->
+  <g>
+    <rect x="6" y="33" width="66" height="30" rx="2" fill="#3C4451"/>
+    <rect x="8" y="35" width="62" height="26" fill="url(#cell)"/>
+    <!-- 셀 그리드 -->
+    <path d="M28 35v26M49 35v26" stroke="#0D1F3C" stroke-width="1.6"/>
+    <path d="M8 43.6h62M8 52.4h62" stroke="#2E5AA8" stroke-width="0.8" opacity="0.7"/>
+    <path d="M13 35v26M18 35v26M23 35v26M33 35v26M38 35v26M43 35v26M54 35v26M59 35v26M64 35v26" stroke="#25498A" stroke-width="0.6" opacity="0.8"/>
+    <!-- 유리 하이라이트 -->
+    <path d="M8 35 L22 35 L14 61 L8 61 Z" fill="#7FA8E8" opacity="0.18"/>
+  </g>
+
+  <!-- 우측 태양전지 어레이 -->
+  <g>
+    <rect x="120" y="33" width="66" height="30" rx="2" fill="#3C4451"/>
+    <rect x="122" y="35" width="62" height="26" fill="url(#cell)"/>
+    <path d="M142 35v26M163 35v26" stroke="#0D1F3C" stroke-width="1.6"/>
+    <path d="M122 43.6h62M122 52.4h62" stroke="#2E5AA8" stroke-width="0.8" opacity="0.7"/>
+    <path d="M127 35v26M132 35v26M137 35v26M147 35v26M152 35v26M157 35v26M168 35v26M173 35v26M178 35v26" stroke="#25498A" stroke-width="0.6" opacity="0.8"/>
+    <path d="M122 35 L136 35 L128 61 L122 61 Z" fill="#7FA8E8" opacity="0.18"/>
+  </g>
+
+  <!-- 본체(버스) — 금박 다층단열재 -->
+  <g>
+    <rect x="82" y="28" width="28" height="40" rx="3" fill="url(#foil)"/>
+    <!-- 단열재 구김 표현 -->
+    <path d="M82 38h28M82 48h28M82 58h28" stroke="#8A6D1B" stroke-width="1" opacity="0.65"/>
+    <path d="M89 28v40M100 28v40" stroke="#A88420" stroke-width="0.8" opacity="0.6"/>
+    <path d="M84 30l6 4M96 33l5 3M86 51l5 3M99 55l6 3" stroke="#F2DA8A" stroke-width="0.9" opacity="0.8"/>
+    <!-- 방열판(라디에이터) -->
+    <rect x="84.5" y="61.5" width="23" height="4.5" rx="1" fill="#C7CEDB"/>
+    <path d="M88 61.5v4.5M92 61.5v4.5M96 61.5v4.5M100 61.5v4.5M104 61.5v4.5" stroke="#8892A0" stroke-width="0.8"/>
+  </g>
+
+  <!-- 접시 안테나 (상단) -->
+  <g>
+    <rect x="93" y="21" width="3" height="8" fill="#6B7280"/>
+    <ellipse cx="94.5" cy="16" rx="15" ry="7.5" fill="url(#dish)"/>
+    <ellipse cx="94.5" cy="17.2" rx="10.5" ry="4.8" fill="#8E99A8" opacity="0.55"/>
+    <!-- 피드혼 -->
+    <line x1="94.5" y1="16" x2="94.5" y2="7.5" stroke="#6B7280" stroke-width="1.4"/>
+    <circle cx="94.5" cy="6.5" r="2" fill="#D9DEE6"/>
+  </g>
+
+  <!-- 통신 안테나 로드 + 자세제어 스러스터 -->
+  <line x1="112" y1="28" x2="120" y2="18" stroke="#8892A0" stroke-width="1.2"/>
+  <circle cx="120.8" cy="17.2" r="1.6" fill="#C7CEDB"/>
+  <g>
+    <path d="M92 68 L100 68 L102.5 74 L89.5 74 Z" fill="#6B7280"/>
+    <ellipse cx="96" cy="74.5" rx="6" ry="2" fill="#3C4451"/>
+  </g>
+
+  <!-- 센서/상태등 포인트 -->
+  <circle cx="86.5" cy="32.5" r="1.4" fill="#FF5A4E"/>
+  <circle cx="105.5" cy="32.5" r="1.4" fill="#66FCF1"/>
+</svg>

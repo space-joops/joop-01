@@ -46,8 +46,8 @@ export const UI_SRC = {
 /** 세로(9:16) 우주 배경 */
 export const BG_SPACE_SRC = "/game/bg/bg_space_portrait.svg";
 
-/** 배경 궤도 연출용 원경 위성 — 보조 드론 (게임플레이와 무관한 장식) */
-export const AMBIENT_SAT_SRC = "/game/pet/support_drone.svg";
+/** 배경 궤도 연출용 원경 위성 — 사실풍 인공위성 (게임플레이와 무관한 장식, 192×96) */
+export const AMBIENT_SAT_SRC = "/game/bg/flyby_satellite.svg";
 
 /**
  * 진화 단계·장비 분기에 맞는 펫 스프라이트 경로.
@@ -80,5 +80,6 @@ export function preloadList(level: number, variant: PetVariant | null): string[]
     ...Object.values(FX_SRC),
     ...Object.values(UI_SRC),
     BG_SPACE_SRC,
+    AMBIENT_SAT_SRC,
   ];
 }
