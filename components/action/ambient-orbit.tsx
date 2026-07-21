@@ -15,7 +15,7 @@ import { AMBIENT_SAT_SRC } from "@/components/action/sortie-assets";
  *   - pointer-events 없음, 게임 레이어(sortie-field)보다 뒤 z-order.
  *   - 피격 화면 흔들림 밖에 둔다: 원경은 흔들리지 않아야 멀어 보인다.
  *   - sortie-field와 같은 escape hatch 패턴: 자체 rAF가 <img> 노드를
- *     직접 만들고 transform으로 옮긴다. 동시 2기뿐이라 부하는 미미.
+ *     직접 만들고 transform으로 옮긴다. 한 번에 한 기뿐이라 부하는 미미.
  *
  * 원근 착시의 재료 두 가지:
  *   1) 경로 = 2차 베지에 곡선 B(t) = (1-t)²P0 + 2(1-t)t·P1 + t²P2
@@ -29,22 +29,23 @@ const AMBIENT = {
   /** 첫 기체 등장까지(초) */
   firstDelay: 1.5,
   /** 다음 기체 스폰 간격 범위(초) */
-  spawnEvery: [5, 9],
-  /** 동시 최대 기체 수 */
-  maxSats: 2,
+  spawnEvery: [6, 10],
+  /** 동시 최대 기체 수 — 큰 기체가 한 대씩 지나가야 영화처럼 장엄하다 */
+  maxSats: 1,
   /** 한 기체가 곡선을 완주하는 시간 범위(초) — 느릴수록 장엄하다 */
-  travelSec: [7, 12],
-  /** 크기: 시작 배율 → 끝 배율 (기준 이미지 96px) */
-  scaleFrom: 0.12,
-  scaleTo: 1.1,
+  travelSec: [9, 14],
+  /** 크기: 시작 배율 → 끝 배율 — 막판엔 화면을 압도할 만큼 가까이 */
+  scaleFrom: 0.1,
+  scaleTo: 2.2,
   /** 크기 가속 지수 — 클수록 막판에 급격히 커진다 */
-  scaleEase: 1.8,
+  scaleEase: 2.0,
   /** 등장 페이드인 구간 (t 비율) — "지구 뒤에서 스윽" */
   fadeIn: 0.15,
-  /** 기준 이미지 크기(px) */
-  imgSize: 96,
-  /** 최대 불투명도 — 배경답게 완전 불투명은 피한다 */
-  maxOpacity: 0.9,
+  /** 기준 이미지 크기(px) — 위성 에셋은 2:1 가로형 */
+  imgW: 144,
+  imgH: 72,
+  /** 최대 불투명도 — 다가올수록 또렷하게 */
+  maxOpacity: 1,
 } as const;
 
 interface AmbientSat {
@@ -53,8 +54,6 @@ interface AmbientSat {
   p0: { x: number; y: number };
   p1: { x: number; y: number };
   p2: { x: number; y: number };
-  /** 좌우 반전 (에셋 하나로 다양성) */
-  flip: 1 | -1;
   travel: number;
   t: number;
 }
@@ -93,11 +92,11 @@ export default function AmbientOrbit() {
       el.src = AMBIENT_SAT_SRC;
       el.alt = "";
       el.className = "pointer-events-none absolute left-0 top-0";
-      el.style.width = `${AMBIENT.imgSize}px`;
-      el.style.height = `${AMBIENT.imgSize}px`;
+      el.style.width = `${AMBIENT.imgW}px`;
+      el.style.height = `${AMBIENT.imgH}px`;
       el.style.willChange = "transform, opacity";
-      // 원경 표현: 살짝 어둡고 채도 낮게 — 상수라 프레임마다 리페인트하지 않는다
-      el.style.filter = "brightness(0.75) saturate(0.8)";
+      // 원경 표현: 살짝 어둡게 — 상수라 프레임마다 리페인트하지 않는다
+      el.style.filter = "brightness(0.85) saturate(0.9)";
       el.style.opacity = "0";
       layer.appendChild(el);
 
@@ -106,7 +105,6 @@ export default function AmbientOrbit() {
         p0,
         p1,
         p2,
-        flip: Math.random() < 0.5 ? 1 : -1,
         travel: rand(AMBIENT.travelSec[0], AMBIENT.travelSec[1]),
         t: 0,
       });
@@ -139,18 +137,23 @@ export default function AmbientOrbit() {
         const x = u * u * s.p0.x + 2 * u * t * s.p1.x + t * t * s.p2.x;
         const y = u * u * s.p0.y + 2 * u * t * s.p1.y + t * t * s.p2.y;
 
-        // 접선(도함수) 방향으로 기수를 돌린다 — 진행 방향을 향한 비행感
+        // 접선(도함수) 방향으로 기수를 기울인다 — 진행 방향을 향한 비행感.
+        // 사실풍 위성은 위아래가 있으므로, 왼쪽으로 갈 땐 180° 회전 대신
+        // 좌우 미러(scaleX 반전)를 쓰고, 기울기는 완만하게 눌러 장엄함을 지킨다.
         const dx = 2 * u * (s.p1.x - s.p0.x) + 2 * t * (s.p2.x - s.p1.x);
         const dy = 2 * u * (s.p1.y - s.p0.y) + 2 * t * (s.p2.y - s.p1.y);
-        const deg = (Math.atan2(dy, dx) * 180) / Math.PI;
+        let heading = (Math.atan2(dy, dx) * 180) / Math.PI;
+        const facingLeft = Math.abs(heading) > 90;
+        if (facingLeft) heading = heading > 0 ? heading - 180 : heading + 180;
+        const deg = heading * 0.6; // 완만한 뱅킹
+        const flip = facingLeft ? -1 : 1;
 
         // 원근: ease-in 스케일 — 다가올수록 가속하며 커진다
         const scale =
           AMBIENT.scaleFrom +
           (AMBIENT.scaleTo - AMBIENT.scaleFrom) * Math.pow(t, AMBIENT.scaleEase);
 
-        const half = AMBIENT.imgSize / 2;
-        s.el.style.transform = `translate3d(${x - half}px, ${y - half}px, 0) rotate(${deg}deg) scale(${scale * s.flip}, ${scale})`;
+        s.el.style.transform = `translate3d(${x - AMBIENT.imgW / 2}px, ${y - AMBIENT.imgH / 2}px, 0) rotate(${deg}deg) scale(${scale * flip}, ${scale})`;
         s.el.style.opacity = String(
           AMBIENT.maxOpacity * Math.min(1, t / AMBIENT.fadeIn),
         );
