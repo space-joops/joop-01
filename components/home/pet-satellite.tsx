@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import type { PointerEvent } from "react";
 import { usePetStore, isSleeping } from "@/stores/pet-store";
-import Satellite3D from "@/components/home/satellite-3d";
+import PetSticker from "@/components/home/pet-sticker";
 
 /**
  * 위성 펫 — 제스처 레이어(DOM) + 3D 본체(R3F) 조합.
@@ -147,9 +147,9 @@ export default function PetSatellite() {
       role="button"
       aria-label="위성 펫 — 탭하면 파편을 먹고, 문지르면 수리돼요"
     >
-      {/* 3D 줍이 — 감정 포즈(호버·처짐·접힘·눈빛)는 스토어를 보고 스스로 연기한다 */}
+      {/* 스티커 줍이 — 감정 표정(프리베이크 스왑)은 스토어를 보고 스스로 연기한다 */}
       <div className="absolute inset-0">
-        <Satellite3D petting={petting} burstNonce={burstNonce} />
+        <PetSticker petting={petting} burstNonce={burstNonce} />
       </div>
 
       {/* 터치 피드백 파티클 레이어 */}
