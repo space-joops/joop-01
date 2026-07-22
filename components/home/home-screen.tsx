@@ -18,6 +18,7 @@ import ConsoleSettings from "@/components/home/console-settings";
 import EvolveSheet, { VARIANT_INFO } from "@/components/home/evolve-sheet";
 import ActionMode from "@/components/action/action-mode";
 import UpgradeSheet from "@/components/home/upgrade-sheet";
+import MonitorScreen from "@/components/monitor/monitor-screen";
 
 /**
  * 홈 화면 (관제 콘솔) — 헤더 · 게이지 · 펫 · 액션 버튼을 조립한다.
@@ -56,6 +57,8 @@ export default function HomeScreen() {
 
   // 관제 설정 시트 (알림 · 설치 · 버전 정보)
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // 궤도 관제 화면 (줍이 실시간 추적)
+  const [monitorOpen, setMonitorOpen] = useState(false);
   // 기체 강화 시트 (파편 소비처)
   const [upgradeOpen, setUpgradeOpen] = useState(false);
 
@@ -179,6 +182,14 @@ export default function HomeScreen() {
           </div>
           <button
             type="button"
+            onClick={() => setMonitorOpen(true)}
+            aria-label="궤도 관제 열기"
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-panel-border bg-panel text-sm transition active:scale-95"
+          >
+            📡
+          </button>
+          <button
+            type="button"
             onClick={() => setSettingsOpen(true)}
             aria-label="관제 설정 열기"
             className="flex h-9 w-9 items-center justify-center rounded-full border border-panel-border bg-panel text-sm transition active:scale-95"
@@ -287,6 +298,13 @@ export default function HomeScreen() {
       <AnimatePresence>
         {sortieOpen && (
           <ActionMode key="sortie" onClose={() => setSortieOpen(false)} />
+        )}
+      </AnimatePresence>
+
+      {/* 궤도 관제 — 줍이 실시간 추적 전체 화면 */}
+      <AnimatePresence>
+        {monitorOpen && (
+          <MonitorScreen key="monitor" onClose={() => setMonitorOpen(false)} />
         )}
       </AnimatePresence>
 
