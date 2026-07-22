@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { AMBIENT_SAT_SRC } from "@/components/action/sortie-assets";
+import {
+  AMBIENT_FLEET,
+  type AmbientCraft,
+} from "@/components/action/sortie-assets";
 
 /**
  * 배경 궤도 연출 — 지구 뒤에서 날아드는 원경 위성들.
@@ -29,27 +32,35 @@ const AMBIENT = {
   /** 첫 기체 등장까지(초) */
   firstDelay: 1.5,
   /** 다음 기체 스폰 간격 범위(초) */
-  spawnEvery: [6, 10],
+  spawnEvery: [5, 9],
   /** 동시 최대 기체 수 — 큰 기체가 한 대씩 지나가야 영화처럼 장엄하다 */
   maxSats: 1,
   /** 한 기체가 곡선을 완주하는 시간 범위(초) — 느릴수록 장엄하다 */
   travelSec: [9, 14],
-  /** 크기: 시작 배율 → 끝 배율 — 막판엔 화면을 압도할 만큼 가까이 */
+  /** 크기: 시작 배율 — 끝 배율은 기체(AMBIENT_FLEET)마다 다르다 */
   scaleFrom: 0.1,
-  scaleTo: 2.2,
   /** 크기 가속 지수 — 클수록 막판에 급격히 커진다 */
   scaleEase: 2.0,
   /** 등장 페이드인 구간 (t 비율) — "지구 뒤에서 스윽" */
   fadeIn: 0.15,
-  /** 기준 이미지 크기(px) — 위성 에셋은 2:1 가로형 */
-  imgW: 144,
-  imgH: 72,
   /** 최대 불투명도 — 다가올수록 또렷하게 */
   maxOpacity: 1,
 } as const;
 
+/** 가중치 뽑기 — 어떤 우주선이 지나갈까 (sortie-field의 pickKind와 같은 룰렛) */
+function pickCraft(): AmbientCraft {
+  const totalW = AMBIENT_FLEET.reduce((acc, c) => acc + c.weight, 0);
+  let r = Math.random() * totalW;
+  for (const craft of AMBIENT_FLEET) {
+    r -= craft.weight;
+    if (r <= 0) return craft;
+  }
+  return AMBIENT_FLEET[0];
+}
+
 interface AmbientSat {
   el: HTMLImageElement;
+  craft: AmbientCraft;
   /** 베지에 제어점 (px) */
   p0: { x: number; y: number };
   p1: { x: number; y: number };
@@ -88,12 +99,13 @@ export default function AmbientOrbit() {
         y: rand(0.25, 0.55) * h,
       };
 
+      const craft = pickCraft();
       const el = document.createElement("img");
-      el.src = AMBIENT_SAT_SRC;
+      el.src = craft.src;
       el.alt = "";
       el.className = "pointer-events-none absolute left-0 top-0";
-      el.style.width = `${AMBIENT.imgW}px`;
-      el.style.height = `${AMBIENT.imgH}px`;
+      el.style.width = `${craft.w}px`;
+      el.style.height = `${craft.h}px`;
       el.style.willChange = "transform, opacity";
       // 원경 표현: 살짝 어둡게 — 상수라 프레임마다 리페인트하지 않는다
       el.style.filter = "brightness(0.85) saturate(0.9)";
@@ -102,6 +114,7 @@ export default function AmbientOrbit() {
 
       sats.push({
         el,
+        craft,
         p0,
         p1,
         p2,
@@ -148,12 +161,13 @@ export default function AmbientOrbit() {
         const deg = heading * 0.6; // 완만한 뱅킹
         const flip = facingLeft ? -1 : 1;
 
-        // 원근: ease-in 스케일 — 다가올수록 가속하며 커진다
+        // 원근: ease-in 스케일 — 다가올수록 가속하며 커진다 (최대 배율은 기체별)
         const scale =
           AMBIENT.scaleFrom +
-          (AMBIENT.scaleTo - AMBIENT.scaleFrom) * Math.pow(t, AMBIENT.scaleEase);
+          (s.craft.scaleTo - AMBIENT.scaleFrom) *
+            Math.pow(t, AMBIENT.scaleEase);
 
-        s.el.style.transform = `translate3d(${x - AMBIENT.imgW / 2}px, ${y - AMBIENT.imgH / 2}px, 0) rotate(${deg}deg) scale(${scale * flip}, ${scale})`;
+        s.el.style.transform = `translate3d(${x - s.craft.w / 2}px, ${y - s.craft.h / 2}px, 0) rotate(${deg}deg) scale(${scale * flip}, ${scale})`;
         s.el.style.opacity = String(
           AMBIENT.maxOpacity * Math.min(1, t / AMBIENT.fadeIn),
         );

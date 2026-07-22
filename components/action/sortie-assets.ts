@@ -46,8 +46,34 @@ export const UI_SRC = {
 /** 세로(9:16) 우주 배경 */
 export const BG_SPACE_SRC = "/game/bg/bg_space_portrait.svg";
 
-/** 배경 궤도 연출용 원경 위성 — 사실풍 인공위성 (게임플레이와 무관한 장식, 192×96) */
-export const AMBIENT_SAT_SRC = "/game/bg/flyby_satellite.svg";
+/** 배경 궤도 연출(플라이바이) 기체 하나의 사양 */
+export interface AmbientCraft {
+  src: string;
+  /** 표시 기준 크기(px) — 에셋 종횡비에 맞춘 값 */
+  w: number;
+  h: number;
+  /** 최대 접근 배율 — 기체의 실제 덩치感을 여기서 낸다 (ISS가 가장 크다) */
+  scaleTo: number;
+  /** 등장 가중치 */
+  weight: number;
+}
+
+/**
+ * 플라이바이 함대 — 우주 덕후 팬서비스: 실존 우주선들이 궤도를 지나간다.
+ * 전부 게임플레이와 무관한 장식. 가중치 뽑기로 한 기씩 등장한다.
+ */
+export const AMBIENT_FLEET: AmbientCraft[] = [
+  // 이름 없는 통신위성 — 궤도의 흔한 이웃
+  { src: "/game/bg/flyby_satellite.svg", w: 144, h: 72, scaleTo: 2.2, weight: 3 },
+  // 국제우주정거장 — 가장 크고 장엄한 플라이바이
+  { src: "/game/bg/flyby_iss.svg", w: 208, h: 104, scaleTo: 2.7, weight: 2 },
+  // 허블 우주망원경 — 은박 경통과 열린 조리개 도어
+  { src: "/game/bg/flyby_hubble.svg", w: 176, h: 66, scaleTo: 2.3, weight: 2 },
+  // 스푸트니크 1호 — 최초의 인공위성, 작지만 반짝인다
+  { src: "/game/bg/flyby_sputnik.svg", w: 96, h: 96, scaleTo: 1.7, weight: 2 },
+  // 제임스 웹 우주망원경 — 금빛 육각 거울의 주인공
+  { src: "/game/bg/flyby_jwst.svg", w: 150, h: 100, scaleTo: 2.4, weight: 2 },
+];
 
 /**
  * 진화 단계·장비 분기에 맞는 펫 스프라이트 경로.
@@ -80,6 +106,6 @@ export function preloadList(level: number, variant: PetVariant | null): string[]
     ...Object.values(FX_SRC),
     ...Object.values(UI_SRC),
     BG_SPACE_SRC,
-    AMBIENT_SAT_SRC,
+    ...AMBIENT_FLEET.map((craft) => craft.src),
   ];
 }
