@@ -1,6 +1,6 @@
 {
   "name": "joop-01",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
@@ -14,6 +14,7 @@
     "@supabase/ssr": "^0.12.3",
     "@supabase/supabase-js": "^2.110.7",
     "framer-motion": "^12.42.2",
+    "lottie-react": "^2.4.1",
     "next": "15.5.20",
     "react": "19.1.0",
     "react-dom": "19.1.0",

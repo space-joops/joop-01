@@ -39,7 +39,12 @@ const STARS = Array.from({ length: 28 }, (_, i) => ({
   duration: 1.8 + ((i * 11) % 10) / 5,
 }));
 
-export default function HomeScreen() {
+export default function HomeScreen({
+  onReplayIntro,
+}: {
+  /** 설정 시트의 '인트로 다시보기' — 게임 루트가 컷신 스테이지로 전환한다 */
+  onReplayIntro?: () => void;
+}) {
   const battery = usePetStore((state) => state.battery);
   const dataUsed = usePetStore((state) => state.dataUsed);
   const debris = usePetStore((state) => state.debris);
@@ -292,6 +297,13 @@ export default function HomeScreen() {
           setSettingsOpen(false);
           enterSortie();
         }}
+        onReplayIntro={
+          onReplayIntro &&
+          (() => {
+            setSettingsOpen(false);
+            onReplayIntro();
+          })
+        }
       />
 
       {/* 출격 — 수동 관제 모드 전체 화면 */}

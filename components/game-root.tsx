@@ -39,6 +39,9 @@ export default function GameRoot() {
     setStage("game");
   };
 
+  // 설정의 '인트로 다시보기' — 언제든 컷신을 다시 감상할 수 있게
+  const replayIntro = () => setStage("intro");
+
   return (
     <div className="relative h-full bg-black">
       {/* 관제 링크 — 화면 밖에서 세션·정산·동기화를 담당 (로컬 모드면 침묵) */}
@@ -62,7 +65,7 @@ export default function GameRoot() {
             animate={{ opacity: 1 }}
             transition={{ duration: 0.8 }}
           >
-            <HomeScreen />
+            <HomeScreen onReplayIntro={replayIntro} />
           </motion.div>
         )}
         {/* stage === "boot"이면 아무것도 그리지 않음 — 컷신 첫 장면(암전)과 자연스럽게 이어진다 */}
