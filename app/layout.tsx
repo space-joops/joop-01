@@ -13,11 +13,51 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+/*
+ * 공유 카드(OG 스크랩)의 절대 URL 기준.
+ * 페이스북·카카오톡·X의 크롤러는 상대 경로를 못 따라가므로, metadataBase가
+ * 있어야 og:image 등이 완전한 주소로 렌더된다. 배포 환경에서는
+ * NEXT_PUBLIC_SITE_URL(예: https://joops.vercel.app)을 설정할 것.
+ */
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+
+const TITLE = "줍스 (JOOPS) — 우주 쓰레기 청소 위성 펫";
+const DESCRIPTION =
+  "클리어 스카이의 오퍼레이터가 되어 인공위성 펫과 함께 우주 쓰레기를 청소하고 밤하늘의 별빛을 되찾으세요.";
+
 export const metadata: Metadata = {
-  title: "줍스 (JOOPS) — 우주 쓰레기 청소 위성 펫",
-  description:
-    "클리어 스카이의 오퍼레이터가 되어 인공위성 펫과 함께 우주 쓰레기를 청소하고 밤하늘의 별빛을 되찾으세요.",
+  metadataBase: new URL(SITE_URL),
+  title: TITLE,
+  description: DESCRIPTION,
   applicationName: "줍스",
+  alternates: { canonical: "/" },
+  /*
+   * 오픈 그래프 — 링크를 붙여넣는 순간 뜨는 미리보기 카드의 표준.
+   * 페이스북·카카오톡·디스코드·슬랙이 전부 이 태그를 스크랩한다.
+   */
+  openGraph: {
+    type: "website",
+    locale: "ko_KR",
+    url: "/",
+    siteName: "줍스 (JOOPS)",
+    title: TITLE,
+    description: DESCRIPTION,
+    images: [
+      {
+        url: "/og.png",
+        width: 1200,
+        height: 630,
+        alt: "줍스 — 인공위성 펫 줍이와 함께 우주 쓰레기를 청소하는 게임",
+      },
+    ],
+  },
+  /* X(트위터) 카드 — OG와 별도 네임스페이스라 같이 선언해 준다 */
+  twitter: {
+    card: "summary_large_image",
+    title: TITLE,
+    description: DESCRIPTION,
+    images: ["/og.png"],
+  },
   /*
    * iOS 홈 화면 설치용 설정.
    * iOS는 매니페스트만으로 부족해서 전용 메타 태그가 따로 필요하다.
