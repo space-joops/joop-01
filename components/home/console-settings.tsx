@@ -75,11 +75,14 @@ export default function ConsoleSettings({
   open,
   onClose,
   onSortie,
+  onReplayIntro,
 }: {
   open: boolean;
   onClose: () => void;
   /** 즉시 출격 — 홈 화면의 출격 경로(배터리 차감 포함)를 그대로 태운다 */
   onSortie: () => void;
+  /** 인트로 다시보기 — 게임 루트가 컷신 스테이지로 전환한다 */
+  onReplayIntro?: () => void;
 }) {
   const isStandalone = usePwaStore((state) => state.isStandalone);
   const installPrompt = usePwaStore((state) => state.installPrompt);
@@ -292,6 +295,25 @@ export default function ConsoleSettings({
                 </button>
               )}
             </div>
+
+            {/* ── 인트로 다시보기 ── */}
+            {onReplayIntro && (
+              <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-panel-border bg-background/50 p-4">
+                <div>
+                  <p className="text-sm font-semibold">🎬 인트로 다시보기</p>
+                  <p className="mt-0.5 text-[11px] leading-snug text-foreground/55">
+                    대폐색의 밤부터 줍이의 첫 출격까지, 오프닝을 다시 감상해요.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={onReplayIntro}
+                  className="shrink-0 rounded-xl border border-panel-border px-3.5 py-2 text-xs font-semibold text-foreground/80 transition active:scale-95"
+                >
+                  재생
+                </button>
+              </div>
+            )}
 
             {/* ── 소셜 공유 ── */}
             <SharePanel />
