@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import SceneLostSky from "@/components/intro/scene-lost-sky";
-import SceneOperatorRoom from "@/components/intro/scene-operator-room";
+import SceneMobileOnboard from "@/components/intro/scene-mobile-onboard";
 import SceneFirstTouch from "@/components/intro/scene-first-touch";
 
 /**
@@ -21,7 +21,7 @@ export default function IntroCutscene({ onFinish }: { onFinish: () => void }) {
       <AnimatePresence mode="wait">
         {scene === 1 && <SceneLostSky key="scene-1" onDone={() => setScene(2)} />}
         {scene === 2 && (
-          <SceneOperatorRoom key="scene-2" onDone={() => setScene(3)} />
+          <SceneMobileOnboard key="scene-2" onDone={() => setScene(3)} />
         )}
         {scene === 3 && <SceneFirstTouch key="scene-3" onDone={onFinish} />}
       </AnimatePresence>

@@ -32,9 +32,14 @@ const SHARD_PATHS = [
   "M3 3 L11 2 L14 9 L8 14 L2 10 Z",
 ];
 
+/*
+ * 대폐색(The Great Blockade) 서사 — 배경 스토리 문서의 캐논.
+ * 버려진 위성들의 연쇄 충돌(케슬러 신드롬)로 하늘이 파편 띠에 갇힌 날.
+ */
 const NARRATION_LINES = [
   "한때 인류는 저 너머의 별을 꿈꿨습니다.",
-  "하지만 지금 우리가 보는 반짝임은… 별빛이 아닙니다.",
+  "하지만 버려진 위성들이 부딪히고, 또 부딪혀… 하늘은 거대한 파편 띠에 갇혔습니다.",
+  "사람들은 그날을 '대폐색'이라 부릅니다. 지금 보이는 반짝임은… 별빛이 아닙니다.",
 ];
 
 export default function SceneLostSky({ onDone }: { onDone: () => void }) {
@@ -48,9 +53,10 @@ export default function SceneLostSky({ onDone }: { onDone: () => void }) {
   useEffect(() => {
     const timers = [
       setTimeout(() => setStep(1), 700),
-      setTimeout(() => setRevealed(true), 4000), // 줌인 + 반전 시작
-      setTimeout(() => setStep(2), 4800),
-      setTimeout(() => onDoneRef.current(), 10500), // 자동 진행
+      setTimeout(() => setRevealed(true), 3800), // 줌인 + 반전 시작
+      setTimeout(() => setStep(2), 4300),
+      setTimeout(() => setStep(3), 8200),
+      setTimeout(() => onDoneRef.current(), 13000), // 자동 진행
     ];
     return () => timers.forEach(clearTimeout);
   }, []);
@@ -145,6 +151,16 @@ export default function SceneLostSky({ onDone }: { onDone: () => void }) {
         {/* 다면체 지구 */}
         <FacetedEarth className="absolute -bottom-4 left-[-15%] w-[130%]" />
       </motion.div>
+
+      {/* 연대기 캡션 — 반전 후 지금이 '어느 시대'인지 못박는다 */}
+      <motion.p
+        className="pointer-events-none absolute inset-x-0 top-[12%] z-20 text-center text-[11px] tracking-[0.4em] text-slate-400/80"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: revealed ? 1 : 0 }}
+        transition={{ duration: 1.6, delay: 0.8 }}
+      >
+        — 궤도 대폐색 이후 7년 —
+      </motion.p>
 
       <Narration lines={NARRATION_LINES} step={step} />
 
