@@ -14,6 +14,7 @@ import {
 import { APP_VERSION } from "@/lib/pwa";
 import StatusGauges from "@/components/home/status-gauges";
 import PetSatellite from "@/components/home/pet-satellite";
+import FloatingDebris from "@/components/home/floating-debris";
 import ConsoleSettings from "@/components/home/console-settings";
 import EvolveSheet, { VARIANT_INFO } from "@/components/home/evolve-sheet";
 import ActionMode from "@/components/action/action-mode";
@@ -223,6 +224,8 @@ export default function HomeScreen({
           />
         ))}
         <PetSatellite />
+        {/* 떠다니는 파편 간식 — 탭하면 줍이가 냠냠 (파편 버튼에만 터치가 산다) */}
+        <FloatingDebris />
       </section>
 
       {/* 상태 메시지 */}
