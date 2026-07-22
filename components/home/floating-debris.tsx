@@ -19,13 +19,13 @@ import { DEBRIS_SRC, type DebrisKind } from "@/components/action/sortie-assets";
 
 /** 동시 최대 개수 — 홈은 간식, 잔치는 미니게임에서 */
 const MAX_ITEMS = 2;
-/** 스폰 판정 주기(ms)와 확률 — 평균 ~23초에 한 개 */
-const SPAWN_ROLL_MS = 8_000;
-const SPAWN_CHANCE = 0.35;
-/** 첫 파편 등장(ms) — 홈에 들어오자마자 하나 흘러온다 */
+/** 스폰 판정 주기(ms)와 확률 — 평균 ~48초에 한 개, 듬성듬성 */
+const SPAWN_ROLL_MS = 12_000;
+const SPAWN_CHANCE = 0.25;
+/** 첫 파편 등장(ms) — 홈에 들어오면 하나쯤은 곧 흘러온다 (발견의 순간) */
 const FIRST_SPAWN_MS = 6_000;
-/** 화면을 가로지르는 시간(초) — 느긋한 표류 */
-const DRIFT_SEC = 70;
+/** 화면을 가로지르는 시간(초) — 서두르지 않는 표류 */
+const DRIFT_SEC = 95;
 
 /** 홈에 흘러드는 소형 파편들 (대형·위험물은 미니게임 전용) */
 const HOME_KINDS: DebrisKind[] = ["chip", "bolt", "nut", "gear"];
