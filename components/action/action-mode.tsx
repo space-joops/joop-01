@@ -75,11 +75,19 @@ export default function ActionMode({ onClose }: ActionModeProps) {
   const durabilityLoss = (result?.hits ?? 0) * HIT_DURABILITY_DAMAGE;
 
   const returnHome = () => {
-    usePetStore.getState().finishSortie({
+    const store = usePetStore.getState();
+    store.finishSortie({
       debris: rewardDebris,
       exp: rewardExp,
       durabilityLoss,
     });
+    // 종류별 수집·피격을 도감(인벤토리) 통계로
+    if (result) {
+      store.recordSortie({
+        kinds: result.kindCounts as Record<string, number>,
+        hits: result.hits,
+      });
+    }
     onClose();
   };
 

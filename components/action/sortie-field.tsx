@@ -56,6 +56,8 @@ export interface SortieResult {
   hits: number;
   /** 비행 시간(초) */
   sec: number;
+  /** 종류별 수거 개수 — 수집 도감(인벤토리)으로 흘러간다 */
+  kindCounts: Partial<Record<DebrisKind, number>>;
 }
 
 /** 분사 단계별 화염 색 — 1단 하늘색 → 3단 빨강 */
@@ -178,6 +180,10 @@ export default function SortieField({ config, onEnd }: SortieFieldProps) {
     let expGain = 0;
     let eaten = 0;
     let hits = 0;
+    const kindCounts: Partial<Record<DebrisKind, number>> = {};
+    const countKind = (kind: DebrisKind) => {
+      kindCounts[kind] = (kindCounts[kind] ?? 0) + 1;
+    };
     const junks: Junk[] = [];
     let done = false;
     let raf = 0;
@@ -312,6 +318,7 @@ export default function SortieField({ config, onEnd }: SortieFieldProps) {
         eaten,
         hits,
         sec: Math.round(elapsed),
+        kindCounts,
       });
     };
     finishRef.current = finish;
@@ -322,6 +329,7 @@ export default function SortieField({ config, onEnd }: SortieFieldProps) {
       debrisValue += j.stat.debris;
       expGain += j.stat.exp;
       eaten += 1;
+      countKind(j.kind);
       // 그물 장비: 대형 파편은 그물을 촥 펼쳐 잡는다
       if (j.kind === "fuel_tank" && isEquip("net")) {
         burstFx(FX_SRC.netThrow, j.x, j.y, 96);
@@ -339,6 +347,7 @@ export default function SortieField({ config, onEnd }: SortieFieldProps) {
 
     const pickupCell = (j: Junk) => {
       j.eatT = 0;
+      countKind(j.kind); // 태양전지도 도감에 오른다
       const revived = emptyAt !== null;
       energy = Math.min(DIFF.startEnergy, energy + DIFF.cellRefill);
       emptyAt = null;
