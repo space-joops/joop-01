@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useRef } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
@@ -11,6 +11,7 @@ import {
   type PetMood,
 } from "@/stores/pet-store";
 import type { PetVariant } from "@/lib/supabase/types";
+import { petSprite } from "@/components/action/sortie-assets";
 
 /**
  * 3D 줍이 — 캐릭터 에셋 팩 v2의 GLB + 감정 포즈 레시피 구현.
@@ -210,8 +211,19 @@ interface Satellite3DProps {
 }
 
 /** GLB를 로드해 감정 연출을 입히는 본체 (Canvas 안에서만 렌더 가능) */
-function PetModel({ url, petting, burstNonce }: Satellite3DProps & { url: string }) {
+function PetModel({
+  url,
+  petting,
+  burstNonce,
+  onReady,
+}: Satellite3DProps & { url: string; onReady?: () => void }) {
   const { scene, nodes, materials } = useGLTF(url);
+
+  // useGLTF가 suspend를 풀고 여기까지 왔다 = 모델 준비 완료.
+  // 부모에게 알려 2D 폴백을 크로스페이드로 걷어낸다.
+  useEffect(() => {
+    onReady?.();
+  }, [onReady]);
 
   // 리그 준비: 노드 참조 + "초기 자세" 백업 + 화면 프레이밍 계산.
   // GLB의 힌지 노드는 기본 자세(matrix)를 갖고 있으므로, 매 프레임
@@ -273,8 +285,10 @@ function PetModel({ url, petting, burstNonce }: Satellite3DProps & { url: string
     wakeFlash: 0,
     ringAngle: 0, // 그물 후프 누적 회전각
     prevEmotion: "normal" as Emotion,
+    entrance: 0, // 착륙 연출 진행도 (0→1)
   }).current;
 
+  const rootRef = useRef<THREE.Group>(null);
   const hoverRef = useRef<THREE.Group>(null);
   const offsetEuler = useMemo(() => new THREE.Euler(), []);
   const offsetQuat = useMemo(() => new THREE.Quaternion(), []);
@@ -290,6 +304,16 @@ function PetModel({ url, petting, burstNonce }: Satellite3DProps & { url: string
     const now = performance.now() / 1000;
     const state = usePetStore.getState();
     const emotion = deriveEmotion(state.mood, state.battery, state.dataUsed);
+
+    // 착륙 연출: 인트로에서 발진한 줍이가 관제 화면에 "도착"한다.
+    // 위에서 스르륵 내려앉으며 커지는 0.9초 — 진화(모델 교체) 때도 재생.
+    st.entrance = Math.min(1, st.entrance + dt / 0.9);
+    const arrive = 1 - Math.pow(1 - st.entrance, 3); // ease-out cubic
+    const root = rootRef.current;
+    if (root) {
+      root.scale.setScalar(rig.scale * (0.55 + 0.45 * arrive));
+      root.position.y = (1 - arrive) * 0.4;
+    }
 
     // 동면에서 깨어나는 순간: 복귀 시퀀스 — 눈 플래시 후 0.55초 뒤 파닥임
     if (st.prevEmotion === "hibernate" && emotion !== "hibernate") {
@@ -400,7 +424,7 @@ function PetModel({ url, petting, burstNonce }: Satellite3DProps & { url: string
   });
 
   return (
-    <group scale={rig.scale}>
+    <group ref={rootRef} scale={rig.scale}>
       <group ref={hoverRef}>
         <primitive
           object={scene}
@@ -417,23 +441,53 @@ export default function Satellite3D(props: Satellite3DProps) {
   const level = usePetStore((state) => state.level);
   const variant = usePetStore((state) => state.variant);
   const url = modelUrlFor(level, variant);
+
+  /*
+   * 심리스 등장: GLB가 로드되는 동안 같은 캐릭터의 2D 스티커(SVG 팩)를
+   * 보여주고, 3D가 준비되면 0.5초 크로스페이드로 바꾼다.
+   * fallback={null}이던 시절엔 펫 자리가 비어 있다가 툭 나타났다(팝인).
+   */
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    setReady(false); // 진화로 모델이 바뀌면 새 단계의 2D 스티커로 이어받는다
+    useGLTF.preload(url);
+  }, [url]);
+
   return (
-    <Canvas
-      // 거의 정면에서 살짝 위 — 얼굴(눈·입)이 가장 사랑스럽게 보이는 각도
-      camera={{ fov: 42, position: [0.16, 0.14, 1.55], near: 0.05, far: 50 }}
-      dpr={[1, 2]}
-      gl={{ antialias: true, alpha: true }}
-      onCreated={({ camera }) => camera.lookAt(0, 0, 0)}
-      className="pointer-events-none" // 제스처는 부모 레이어가 받는다
-    >
-      {/* 조명 3개로 끝 — 모바일 발열 최소화 (뷰어 레퍼런스와 동일 구성) */}
-      <hemisphereLight args={[0x9fb8ff, 0x1a2440, 0.9]} />
-      <directionalLight color={0xfff4e0} intensity={1.0} position={[1.4, 2.2, 1.6]} />
-      <directionalLight color={0x7df5ea} intensity={0.4} position={[-2, 0.6, -2]} />
-      <Suspense fallback={null}>
-        <PetModel key={url} url={url} {...props} />
-      </Suspense>
-    </Canvas>
+    <div className="relative h-full w-full">
+      <Canvas
+        // 거의 정면에서 살짝 위 — 얼굴(눈·입)이 가장 사랑스럽게 보이는 각도
+        camera={{ fov: 42, position: [0.16, 0.14, 1.55], near: 0.05, far: 50 }}
+        dpr={[1, 2]}
+        gl={{ antialias: true, alpha: true }}
+        onCreated={({ camera }) => camera.lookAt(0, 0, 0)}
+        className="pointer-events-none" // 제스처는 부모 레이어가 받는다
+      >
+        {/* 조명 3개로 끝 — 모바일 발열 최소화 (뷰어 레퍼런스와 동일 구성) */}
+        <hemisphereLight args={[0x9fb8ff, 0x1a2440, 0.9]} />
+        <directionalLight color={0xfff4e0} intensity={1.0} position={[1.4, 2.2, 1.6]} />
+        <directionalLight color={0x7df5ea} intensity={0.4} position={[-2, 0.6, -2]} />
+        <Suspense fallback={null}>
+          <PetModel key={url} url={url} onReady={() => setReady(true)} {...props} />
+        </Suspense>
+      </Canvas>
+
+      {/* 2D 폴백 스티커 — 3D 준비 전까지 자리를 지키다 스르륵 사라진다 */}
+      <div
+        className={`pointer-events-none absolute inset-0 flex items-center justify-center transition-opacity duration-500 ${
+          ready ? "opacity-0" : "opacity-100"
+        }`}
+        aria-hidden
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element -- 벡터 SVG 폴백 스프라이트 */}
+        <img
+          src={petSprite(level, variant)}
+          alt=""
+          className="w-40 animate-pulse drop-shadow-[0_0_26px_rgba(129,140,248,0.45)]"
+          draggable={false}
+        />
+      </div>
+    </div>
   );
 }
 
