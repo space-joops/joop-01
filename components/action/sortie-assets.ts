@@ -31,6 +31,7 @@ export const FX_SRC = {
   magnetField: "/game/fx/fx_magnet_field.svg",
   netThrow: "/game/fx/fx_net_throw.svg",
   laserBeam: "/game/fx/fx_laser_beam.svg",
+  zzz: "/game/fx/fx_zzz.svg",
 } as const;
 
 /** HUD·브리핑 UI 아이콘 — 96×96 */
@@ -76,13 +77,26 @@ export const AMBIENT_FLEET: AmbientCraft[] = [
 ];
 
 /**
- * 진화 단계·장비 분기에 맞는 펫 스프라이트 경로.
- * happy=true면 프리베이크된 기쁨 포즈(결과 화면용)를 쓴다.
+ * 에셋 팩의 감정 프리베이크 6종 — 파일명 접미사(`이름__감정.svg`)와 일치.
+ * 생략(undefined)이면 평상(normal) 포즈.
+ */
+export type PetEmotion =
+  | "happy"
+  | "low_battery"
+  | "data_full"
+  | "sulky"
+  | "powersave"
+  | "hibernate";
+
+/**
+ * 진화 단계·장비 분기·감정에 맞는 펫 스티커 경로.
+ * 감정별 포즈(안테나 처짐·날개 접힘·눈빛)는 팩에 미리 구워져 있어
+ * 파일 스왑만으로 기분 연출이 된다.
  */
 export function petSprite(
   level: number,
   variant: PetVariant | null,
-  happy = false,
+  emotion?: PetEmotion,
 ): string {
   const name =
     level >= 3
@@ -90,7 +104,7 @@ export function petSprite(
       : level === 2
         ? "pet_stage2_junior"
         : "pet_stage1_baby";
-  return `/game/pet/${name}${happy ? "__happy" : ""}.svg`;
+  return `/game/pet/${name}${emotion ? `__${emotion}` : ""}.svg`;
 }
 
 /**
@@ -101,7 +115,7 @@ export function petSprite(
 export function preloadList(level: number, variant: PetVariant | null): string[] {
   return [
     petSprite(level, variant),
-    petSprite(level, variant, true),
+    petSprite(level, variant, "happy"),
     ...Object.values(DEBRIS_SRC),
     ...Object.values(FX_SRC),
     ...Object.values(UI_SRC),

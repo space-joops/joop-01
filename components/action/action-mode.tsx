@@ -227,7 +227,7 @@ export default function ActionMode({ onClose }: ActionModeProps) {
               </p>
               {/* eslint-disable-next-line @next/next/no-img-element -- 벡터 SVG 스프라이트 */}
               <img
-                src={petSprite(snapshot.level, snapshot.variant, true)}
+                src={petSprite(snapshot.level, snapshot.variant, "happy")}
                 alt="기뻐하는 줍이"
                 className="mx-auto mt-3 h-24 w-24"
                 draggable={false}
