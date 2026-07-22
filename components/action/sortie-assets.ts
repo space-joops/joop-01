@@ -66,6 +66,8 @@ export interface AmbientCraft {
 export const AMBIENT_FLEET: AmbientCraft[] = [
   // 이름 없는 통신위성 — 궤도의 흔한 이웃
   { src: "/game/bg/flyby_satellite.svg", w: 144, h: 72, scaleTo: 2.2, weight: 3 },
+  // 스타링크형 플랫 패널 위성 — 요즘 궤도에서 가장 자주 마주치는 얼굴
+  { src: "/game/bg/flyby_starlink.svg", w: 150, h: 105, scaleTo: 2.0, weight: 3 },
   // 국제우주정거장 — 가장 크고 장엄한 플라이바이
   { src: "/game/bg/flyby_iss.svg", w: 208, h: 104, scaleTo: 2.7, weight: 2 },
   // 허블 우주망원경 — 은박 경통과 열린 조리개 도어

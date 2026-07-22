@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 112" width="160" height="112" fill="none">
+  <!-- 플라이바이: 스타링크형 통신위성 — 납작한 플랫 패널 버스 + 위로 세운 대형 단일 태양돛 -->
+  <defs>
+    <linearGradient id="stl-sail" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3566B8"/>
+      <stop offset="0.55" stop-color="#1B3B6F"/>
+      <stop offset="1" stop-color="#12294E"/>
+    </linearGradient>
+    <linearGradient id="stl-bus" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#EDF1F7"/>
+      <stop offset="0.5" stop-color="#C3CAD6"/>
+      <stop offset="1" stop-color="#8B93A1"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 대형 단일 태양돛 (수직) -->
+  <g>
+    <rect x="60" y="4" width="40" height="70" rx="2" fill="#3C4451"/>
+    <rect x="62" y="6" width="36" height="66" fill="url(#stl-sail)"/>
+    <!-- 셀 그리드 -->
+    <path d="M80 6v66" stroke="#0D1F3C" stroke-width="1.4"/>
+    <path d="M62 17h36M62 28h36M62 39h36M62 50h36M62 61h36" stroke="#2E5AA8" stroke-width="0.7" opacity="0.75"/>
+    <path d="M71 6v66M89 6v66" stroke="#25498A" stroke-width="0.6" opacity="0.8"/>
+    <!-- 유리 하이라이트 -->
+    <path d="M62 6 L74 6 L66 72 L62 72 Z" fill="#7FA8E8" opacity="0.16"/>
+  </g>
+
+  <!-- 돛-버스 연결 힌지 -->
+  <rect x="77" y="72" width="6" height="8" rx="1.5" fill="#5A6472"/>
+  <rect x="74" y="78" width="12" height="3" rx="1.5" fill="#8892A0"/>
+
+  <!-- 플랫 패널 버스 (납작한 본체, 살짝 비스듬한 시점) -->
+  <g>
+    <path d="M22 88 L138 82 L146 96 L30 103 Z" fill="url(#stl-bus)"/>
+    <path d="M22 88 L138 82 L139 85 L23 91 Z" fill="#FAFBFD" opacity="0.7"/>
+    <path d="M30 103 L146 96 L146 99 L30 106 Z" fill="#5F6874"/>
+    <!-- 위상배열 안테나 패널 디테일 -->
+    <g fill="#9AA3B2" opacity="0.9">
+      <rect x="40" y="90" width="16" height="8" rx="1" transform="rotate(-2 48 94)"/>
+      <rect x="64" y="88.5" width="16" height="8" rx="1" transform="rotate(-2 72 92)"/>
+      <rect x="88" y="87" width="16" height="8" rx="1" transform="rotate(-2 96 91)"/>
+      <rect x="112" y="85.5" width="16" height="8" rx="1" transform="rotate(-2 120 89)"/>
+    </g>
+    <!-- 스러스터 포트·상태등 -->
+    <circle cx="34" cy="97" r="2.2" fill="#3C4451"/>
+    <circle cx="141" cy="90" r="1.6" fill="#66FCF1"/>
+  </g>
+</svg>

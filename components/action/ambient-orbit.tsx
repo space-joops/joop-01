@@ -43,6 +43,9 @@ const AMBIENT = {
   scaleEase: 2.0,
   /** 등장 페이드인 구간 (t 비율) — "지구 뒤에서 스윽" */
   fadeIn: 0.15,
+  /** 퇴장 페이드아웃 구간 (t 비율) — 가까이 커진 채 사이드로 스르륵.
+   *  없으면 경로 끝에서 노드가 즉시 제거되며 "깜빡" 사라져 보인다 */
+  fadeOut: 0.14,
   /** 최대 불투명도 — 다가올수록 또렷하게 */
   maxOpacity: 1,
 } as const;
@@ -94,8 +97,9 @@ export default function AmbientOrbit() {
       const exitRight = Math.random() < 0.5;
       const p0 = { x: rand(0.05, 0.45) * w, y: rand(0.78, 0.95) * h };
       const p1 = { x: rand(0.25, 0.75) * w, y: rand(0.15, 0.4) * h };
+      // 종점은 화면 밖 여유를 넉넉히 — 커진 기체가 사이드로 완전히 빠져나가며 사라진다
       const p2 = {
-        x: (exitRight ? 1.15 : -0.15) * w,
+        x: (exitRight ? 1.2 : -0.2) * w,
         y: rand(0.25, 0.55) * h,
       };
 
@@ -168,8 +172,11 @@ export default function AmbientOrbit() {
             Math.pow(t, AMBIENT.scaleEase);
 
         s.el.style.transform = `translate3d(${x - s.craft.w / 2}px, ${y - s.craft.h / 2}px, 0) rotate(${deg}deg) scale(${scale * flip}, ${scale})`;
+        // 등장 페이드인 × 퇴장 페이드아웃 — 나타날 때도, 사라질 때도 스르륵
         s.el.style.opacity = String(
-          AMBIENT.maxOpacity * Math.min(1, t / AMBIENT.fadeIn),
+          AMBIENT.maxOpacity *
+            Math.min(1, t / AMBIENT.fadeIn) *
+            Math.min(1, (1 - t) / AMBIENT.fadeOut),
         );
       }
     };
