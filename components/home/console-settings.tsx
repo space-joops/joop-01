@@ -18,6 +18,7 @@ import {
   SORTIE_BATTERY_COST,
   SORTIE_MIN_BATTERY,
 } from "@/stores/pet-store";
+import SharePanel from "@/components/home/share-panel";
 
 /**
  * 관제 설정 시트 — 헤더의 ⚙️ 버튼으로 여는 하단 시트.
@@ -291,6 +292,9 @@ export default function ConsoleSettings({
                 </button>
               )}
             </div>
+
+            {/* ── 소셜 공유 ── */}
+            <SharePanel />
 
             {/* ── 시스템 정보 ── */}
             {notice && (
