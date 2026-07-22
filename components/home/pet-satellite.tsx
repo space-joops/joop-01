@@ -45,6 +45,8 @@ export default function PetSatellite() {
   const mood = usePetStore((state) => state.mood);
   const eatDebris = usePetStore((state) => state.eatDebris);
   const soothe = usePetStore((state) => state.soothe);
+  // 펫 터치 밖(부유 파편 등)에서 온 기쁨 신호 — 탭 버스트와 합산해 전달
+  const burstSignal = usePetStore((state) => state.burstSignal);
 
   const sleeping = isSleeping(battery);
   const hibernating = mood === "hibernate";
@@ -149,7 +151,7 @@ export default function PetSatellite() {
     >
       {/* 스티커 줍이 — 감정 표정(프리베이크 스왑)은 스토어를 보고 스스로 연기한다 */}
       <div className="absolute inset-0">
-        <PetSticker petting={petting} burstNonce={burstNonce} />
+        <PetSticker petting={petting} burstNonce={burstNonce + burstSignal} />
       </div>
 
       {/* 터치 피드백 파티클 레이어 */}

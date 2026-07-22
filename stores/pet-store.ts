@@ -112,6 +112,12 @@ interface PetState {
   sortieCount: number;
   /** 총 피격(충돌) 횟수 */
   hitCount: number;
+  /**
+   * 펫 기쁨 버스트 신호 — 값이 오를 때마다 홈 펫이 폴짝 뛴다.
+   * 부유 파편처럼 펫 터치 밖에서 일어난 수집도 펫이 반응하게 하는
+   * 연출 전용 카운터 (저장 안 함 — partialize 제외)
+   */
+  burstSignal: number;
 
   /** [Tap] 파편 냠냠 — 자원 획득, 데이터가 쌓이고 배터리를 조금 쓴다 */
   eatDebris: () => void;
@@ -132,6 +138,8 @@ interface PetState {
   setUpgrades: (levels: UpgradeLevels) => void;
   /** 로컬 모드 전용 강화 구매 — 서버 연동 시엔 buyUpgrade 액션 결과 사용 */
   buyUpgradeLocal: (key: UpgradeKey) => void;
+  /** 펫 기쁨 버스트 트리거 — 냠 연출 요청 */
+  triggerPetBurst: () => void;
   /** 파편 1개 수집을 도감에 기록 (홈 부유 파편·미니게임 공용) */
   recordCollect: (kind: string, count?: number) => void;
   /** 출격 1회의 종류별 수집·피격을 도감·통계에 합산 */
@@ -172,6 +180,10 @@ export const usePetStore = create<PetState>()(
       collection: {},
       sortieCount: 0,
       hitCount: 0,
+      burstSignal: 0,
+
+      triggerPetBurst: () =>
+        set((state) => ({ burstSignal: state.burstSignal + 1 })),
 
       recordCollect: (kind, count = 1) =>
         set((state) => ({

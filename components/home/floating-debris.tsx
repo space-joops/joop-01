@@ -19,13 +19,13 @@ import { DEBRIS_SRC, type DebrisKind } from "@/components/action/sortie-assets";
 
 /** 동시 최대 개수 — 홈은 간식, 잔치는 미니게임에서 */
 const MAX_ITEMS = 2;
-/** 스폰 판정 주기(ms)와 확률 — 평균 ~23초에 한 개 */
-const SPAWN_ROLL_MS = 8_000;
-const SPAWN_CHANCE = 0.35;
-/** 첫 파편 등장(ms) — 홈에 들어오자마자 하나 흘러온다 */
+/** 스폰 판정 주기(ms)와 확률 — 평균 ~31초에 한 개 */
+const SPAWN_ROLL_MS = 10_000;
+const SPAWN_CHANCE = 0.32;
+/** 첫 파편 등장(ms) — 홈에 들어오면 하나쯤은 곧 흘러온다 (발견의 순간) */
 const FIRST_SPAWN_MS = 6_000;
-/** 화면을 가로지르는 시간(초) — 느긋한 표류 */
-const DRIFT_SEC = 70;
+/** 화면을 가로지르는 시간(초) — 서두르지 않는 표류 */
+const DRIFT_SEC = 95;
 
 /** 홈에 흘러드는 소형 파편들 (대형·위험물은 미니게임 전용) */
 const HOME_KINDS: DebrisKind[] = ["chip", "bolt", "nut", "gear"];
@@ -81,9 +81,10 @@ export default function FloatingDebris() {
     if (item.collected) return;
     const s = usePetStore.getState();
     if (s.mood === "hibernate" || isSleeping(s.battery)) return;
-    // 펫 탭과 같은 규칙으로 수집 + 도감 기록
+    // 펫 탭과 같은 규칙으로 수집 + 도감 기록 + 줍이 냠 리액션
     s.eatDebris();
     s.recordCollect(item.kind);
+    s.triggerPetBurst();
     setItems((prev) =>
       prev.map((it) => (it.id === item.id ? { ...it, collected: true } : it)),
     );
@@ -99,7 +100,7 @@ export default function FloatingDebris() {
             key={item.id}
             type="button"
             aria-label="떠다니는 파편 수집"
-            className="pointer-events-auto absolute -ml-6 -mt-6 p-1.5"
+            className="pointer-events-auto absolute -ml-8 -mt-8 p-2"
             style={{ top: `${item.top}%` }}
             initial={{ left: item.dir === 1 ? "-8%" : "108%", opacity: 0 }}
             animate={
@@ -127,11 +128,16 @@ export default function FloatingDebris() {
               collect(item);
             }}
           >
+            {/* 후광 — 어두운 배경에서 파편이 묻히지 않게 은은한 발광 */}
+            <span
+              className="absolute inset-0 -z-10 animate-pulse rounded-full bg-sky-200/25 blur-md"
+              aria-hidden
+            />
             {/* eslint-disable-next-line @next/next/no-img-element -- 벡터 SVG 파편 */}
             <img
               src={DEBRIS_SRC[item.kind]}
               alt=""
-              className="w-9 animate-pulse drop-shadow-[0_0_10px_rgba(207,224,255,0.45)]"
+              className="w-14 [filter:brightness(1.2)_drop-shadow(0_0_14px_rgba(207,224,255,0.9))]"
               draggable={false}
             />
           </motion.button>
